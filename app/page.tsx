@@ -18,10 +18,18 @@ export default function AdminPage() {
   async function load() {
     setStatus("Aanvragen laden…");
 
-    let q = supabase.from("repair_requests").select("*").order("created_at", { ascending: false });
+    // ✅ Select alleen kolommen die bestaan + jouw nieuwe velden
+    let q = supabase
+      .from("repair_requests")
+      .select(
+        "id, created_at, customer_name, customer_email, customer_phone, brand, model, color, issue, price_text, preferred_date, preferred_time, status, condition, quality, warranty, notes"
+      )
+      .order("created_at", { ascending: false });
+
     if (filter !== "all") q = q.eq("status", filter);
 
     const { data, error } = await q;
+
     if (error) {
       console.error(error);
       setRows([]);
@@ -54,21 +62,41 @@ export default function AdminPage() {
     load();
   }
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+  load(); // initial
+
+  const t = setInterval(() => {
+    load();
+  }, 10000); // elke 10 sec
+
+  return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [filter]);
 
   return (
     <div style={{ padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>Reparatie-aanvragen (beheer)</h1>
+      <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 6 }}>
+        Reparatie-aanvragen (beheer)
+      </h1>
       <p style={{ color: "#555", marginBottom: 16 }}>Alleen intern gebruik.</p>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
         <div style={{ color: "#555", fontSize: 14 }}>{status}</div>
-        <select value={filter} onChange={(e) => setFilter(e.target.value as any)} style={{ padding: "6px 10px" }}>
+
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as any)}
+          style={{ padding: "6px 10px" }}
+        >
           <option value="pending">Alleen pending</option>
           <option value="approved">Alleen approved</option>
           <option value="all">Alles</option>
         </select>
-        <button onClick={load} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd" }}>
+
+        <button
+          onClick={load}
+          style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #ddd" }}
+        >
           Refresh
         </button>
       </div>
@@ -77,44 +105,89 @@ export default function AdminPage() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr style={{ background: "#f5f5f5" }}>
-              {["Datum","Naam","Contact","Toestel","Reparatie","Richtprijs","Voorkeur","Status","Acties"].map(h => (
-                <th key={h} style={{ border: "1px solid #ddd", padding: 8, textAlign: "left" }}>{h}</th>
+              {[
+                "Datum",
+                "Naam",
+                "Contact",
+                "Toestel",
+                "Reparatie",
+                "Richtprijs",
+                "Voorkeur",
+                "Status",
+                "Conditie",
+                "Kwaliteit",
+                "Garantie",
+                "Notities",
+                "Acties",
+              ].map((h) => (
+                <th
+                  key={h}
+                  style={{ border: "1px solid #ddd", padding: 8, textAlign: "left", whiteSpace: "nowrap" }}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
+
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ border: "1px solid #ddd", padding: 12, textAlign: "center" }}>
+                <td colSpan={13} style={{ border: "1px solid #ddd", padding: 12, textAlign: "center" }}>
                   Geen aanvragen.
                 </td>
               </tr>
-            ) : rows.map((r: any) => {
-              const createdAt = r.created_at ? new Date(r.created_at).toLocaleString("nl-NL") : "";
-              const toestel = [r.brand||"", r.model||"", r.color?`(${r.color})`:""].join(" ").trim();
-              const contact = `${r.customer_email||""}${r.customer_phone?` / ${r.customer_phone}`:""}`;
-              const voorkeur = `${r.preferred_date||""}${r.preferred_time?` ${r.preferred_time}`:""}`;
+            ) : (
+              rows.map((r: any) => {
+                const createdAt = r.created_at ? new Date(r.created_at).toLocaleString("nl-NL") : "";
+                const toestel = [r.brand || "", r.model || "", r.color ? `(${r.color})` : ""].join(" ").trim();
+                const contact = `${r.customer_email || ""}${r.customer_phone ? ` / ${r.customer_phone}` : ""}`;
+                const voorkeur = `${r.preferred_date || ""}${r.preferred_time ? ` ${r.preferred_time}` : ""}`;
 
-              return (
-                <tr key={r.id}>
-                  {[createdAt, r.customer_name||"", contact, toestel, r.issue||"", r.price_text||"", voorkeur, r.status||""]
-                    .map((t, i) => <td key={i} style={{ border: "1px solid #ddd", padding: 8 }}>{t}</td>)}
+                return (
+                  <tr key={r.id}>
+                    {[
+                      createdAt,
+                      r.customer_name || "",
+                      contact,
+                      toestel,
+                      r.issue || "",
+                      r.price_text || "",
+                      voorkeur,
+                      r.status || "",
+                      r.condition || "",
+                      r.quality || "",
+                      r.warranty || "",
+                      r.notes || "",
+                    ].map((t, i) => (
+                      <td key={i} style={{ border: "1px solid #ddd", padding: 8, verticalAlign: "top" }}>
+                        {t}
+                      </td>
+                    ))}
 
-                  <td style={{ border: "1px solid #ddd", padding: 8 }}>
-                    {r.status === "approved" ? (
-                      <span style={{ color: "#16a34a", fontWeight: 800 }}>✔ Goedgekeurd</span>
-                    ) : (
-                      <button
-                        onClick={() => approve(r.id)}
-                        style={{ padding: "6px 10px", border: 0, borderRadius: 10, background: "#16a34a", color: "#fff", cursor: "pointer" }}
-                      >
-                        Goedkeuren
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+                    <td style={{ border: "1px solid #ddd", padding: 8, whiteSpace: "nowrap" }}>
+                      {r.status === "approved" ? (
+                        <span style={{ color: "#16a34a", fontWeight: 800 }}>✔ Goedgekeurd</span>
+                      ) : (
+                        <button
+                          onClick={() => approve(r.id)}
+                          style={{
+                            padding: "6px 10px",
+                            border: 0,
+                            borderRadius: 10,
+                            background: "#16a34a",
+                            color: "#fff",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Goedkeuren
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
