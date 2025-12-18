@@ -1,6 +1,30 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import * as nodemailer from "nodemailer";
+import nodemailer from "nodemailer";
+
+const allowedOrigins = [
+  "https://gsmteam.nl",
+  "https://www.gsmteam.nl",
+  "https://gsm-team-2.myshopify.com", // jouw shopify domein
+];
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Credentials": "true",
+  };
+}
+
+// Preflight handler (BELANGRIJK)
+export async function OPTIONS(req: Request) {
+  return new Response(null, { status: 204, headers: corsHeaders(req) });
+}
+
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,7 +69,8 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error("Supabase insert error:", error);
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
+      return NextResponse.json({ error: "Database error" }, { status: 500, headers: corsHeaders(req) });
+
     }
 
     // 2) Mail
@@ -105,7 +130,7 @@ export async function POST(req: Request) {
       html,
     });
 
-    return NextResponse.json({ ok: true, id: data.id }, { status: 200 });
+    return NextResponse.json({ ok: true, id: data.id }, { status: 200, headers: corsHeaders(req) });
   } catch (err) {
     console.error("create-request error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
