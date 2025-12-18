@@ -2,86 +2,123 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 
+// Nodemailer vereist Node runtime (NIET edge)
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const allowedOrigins = [
   "https://gsmteam.nl",
   "https://www.gsmteam.nl",
-  "https://gsm-team-2.myshopify.com", // jouw shopify domein
+  "https://gsm-team-2.myshopify.com",
 ];
 
-function corsHeaders(req: Request) {
+function getOrigin(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  if (allowedOrigins.includes(origin)) return origin;
+  // Als origin ontbreekt (bijv. server-to-server) -> geen wildcard met credentials
+  return "";
+}
 
-  return {
-    "Access-Control-Allow-Origin": allowOrigin,
+function corsHeaders(req: Request) {
+  const origin = getOrigin(req);
+
+  // Als we geen origin hebben, zetten we geen ACAO header
+  // (anders kan het botsen met credentials/policies)
+  const base: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Credentials": "true",
+    "Vary": "Origin",
   };
+
+  if (origin) base["Access-Control-Allow-Origin"] = origin;
+  return base;
 }
-
-// Preflight handler (BELANGRIJK)
-export async function OPTIONS(req: Request) {
-  return new Response(null, { status: 204, headers: corsHeaders(req) });
-}
-
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 function safe(v: any) {
   return String(v ?? "").replace(/[<>]/g, "");
 }
 
+function json(req: Request, body: any, status = 200) {
+  return NextResponse.json(body, { status, headers: corsHeaders(req) });
+}
+
+// Preflight
+export async function OPTIONS(req: Request) {
+  return new Response(null, { status: 204, headers: corsHeaders(req) });
+}
+
+function requireEnv(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
 export async function POST(req: Request) {
   try {
+    // --- ENV (server-only) ---
+    const SUPABASE_URL = requireEnv("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+
+    const SMTP_HOST = requireEnv("SMTP_HOST");
+    const SMTP_PORT = Number(process.env.SMTP_PORT || "465");
+    const SMTP_USER = requireEnv("SMTP_USER");
+    const SMTP_PASS = requireEnv("SMTP_PASS");
+
+    const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
+
+    // --- BODY ---
     const body = await req.json();
 
-    const customer_email = safe(body.customer_email);
-    const customer_name = safe(body.customer_name);
+    const customer_email = safe(body.customer_email).trim();
+    const customer_name = safe(body.customer_name).trim();
 
     if (!customer_email) {
-      return NextResponse.json({ error: "Missing customer_email" }, { status: 400 });
+      return json(req, { error: "Missing customer_email" }, 400);
     }
 
-    // 1) Insert
+    // --- SUPABASE ADMIN CLIENT ---
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    // 1) Insert repair request
     const insertPayload = {
       customer_name,
       customer_email,
-      customer_phone: safe(body.customer_phone),
-      brand: safe(body.brand),
-      model: safe(body.model),
-      color: safe(body.color),
-      issue: safe(body.issue),
-      price_text: safe(body.price_text),
-      preferred_date: safe(body.preferred_date),
-      preferred_time: safe(body.preferred_time),
-      status: "pending",
+      customer_phone: safe(body.customer_phone).trim(),
+      brand: safe(body.brand).trim(),
+      model: safe(body.model).trim(),
+      color: safe(body.color).trim(),
+      issue: safe(body.issue).trim(),
+      price_text: safe(body.price_text).trim(),
+      preferred_date: safe(body.preferred_date).trim(),
+      preferred_time: safe(body.preferred_time).trim(),
+      status: "pending" as const,
     };
 
     const { data, error } = await supabaseAdmin
       .from("repair_requests")
       .insert(insertPayload)
-      .select()
+      .select("id")
       .single();
 
-    if (error) {
+    if (error || !data?.id) {
       console.error("Supabase insert error:", error);
-      return NextResponse.json({ error: "Database error" }, { status: 500, headers: corsHeaders(req) });
-
+      return json(req, { error: "Database error", detail: safe(error?.message) }, 500);
     }
 
-    // 2) Mail
+    // 2) Mail (met veilige SMTP defaults)
+    const secure = SMTP_PORT === 465; // 465 = SSL, 587 = STARTTLS
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!,
-      port: Number(process.env.SMTP_PORT || 465),
-      secure: true,
-      auth: {
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!,
-      },
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      // voorkomt “hang” bij rare SMTP issues
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
     });
 
     const toestel = [insertPayload.brand, insertPayload.model, insertPayload.color]
@@ -99,7 +136,7 @@ export async function POST(req: Request) {
         <div style="padding:18px 18px;border:1px solid #e6ecf5;border-radius:14px;background:#ffffff">
           <h2 style="margin:0 0 10px 0;">Bevestiging reparatie-aanvraag</h2>
           <p style="margin:0 0 14px 0;color:#444">
-            Bedankt${customer_name ? " " + customer_name : ""}! We hebben je aanvraag ontvangen.
+            Bedankt${customer_name ? " " + safe(customer_name) : ""}! We hebben je aanvraag ontvangen.
           </p>
 
           <div style="padding:12px 14px;border-radius:12px;background:#f6f8fc;border:1px solid #e6ecf5">
@@ -123,16 +160,31 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: process.env.MAIL_FROM || process.env.SMTP_USER!,
-      to: customer_email,
-      subject: "Bevestiging reparatie-aanvraag – GSM Team",
-      html,
-    });
+    try {
+      await transporter.sendMail({
+        from: MAIL_FROM,
+        to: customer_email,
+        subject: "Bevestiging reparatie-aanvraag – GSM Team",
+        html,
+      });
+    } catch (mailErr: any) {
+      // Belangrijk: aanvraag is al opgeslagen, dus geef duidelijke response terug
+      console.error("Mail send error:", mailErr);
+      return json(
+        req,
+        {
+          ok: true,
+          id: data.id,
+          mail_sent: false,
+          mail_error: safe(mailErr?.message || "Mail error"),
+        },
+        200
+      );
+    }
 
-    return NextResponse.json({ ok: true, id: data.id }, { status: 200, headers: corsHeaders(req) });
-  } catch (err) {
+    return json(req, { ok: true, id: data.id, mail_sent: true }, 200);
+  } catch (err: any) {
     console.error("create-request error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return json(req, { error: "Server error", detail: safe(err?.message) }, 500);
   }
 }
