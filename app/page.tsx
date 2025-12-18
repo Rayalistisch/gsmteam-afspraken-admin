@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Row = any;
 
@@ -25,27 +20,20 @@ function cx(...parts: Array<string | false | undefined | null>) {
 
 /** Heuristiek: herken "nieuw" vs "gebruikt" */
 function getNewness(row: any): "new" | "used" | "unknown" {
-  const hay = [
-    row.condition,
-    row.quality,
-    row.warranty,
-    row.notes,
-    row.issue,
-  ]
+  const hay = [row.condition, row.quality, row.warranty, row.notes, row.issue]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 
-  // NEW hints
   if (
     hay.includes("nieuw") ||
     hay.includes("nieuw in doos") ||
     hay.includes("sealed") ||
     hay.includes("ongebruikt") ||
     hay.includes("new")
-  ) return "new";
+  )
+    return "new";
 
-  // USED hints
   if (
     hay.includes("gebruikt") ||
     hay.includes("tweedehands") ||
@@ -54,9 +42,18 @@ function getNewness(row: any): "new" | "used" | "unknown" {
     hay.includes("used") ||
     hay.includes("b-grade") ||
     hay.includes("c-grade")
-  ) return "used";
+  )
+    return "used";
 
   return "unknown";
+}
+
+// Maak client pas aan tijdens runtime (en niet tijdens build/prerender)
+function buildSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  if (!url || !key) return null;
+  return createClient(url, key);
 }
 
 export default function AdminPage() {
@@ -66,6 +63,8 @@ export default function AdminPage() {
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const supabase = useMemo(() => buildSupabaseClient(), []);
 
   const visibleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -98,6 +97,12 @@ export default function AdminPage() {
   }, [rows, query]);
 
   async function load(silent = false) {
+    if (!supabase) {
+      setRows([]);
+      setStatus("Supabase env ontbreekt (NEXT_PUBLIC_SUPABASE_URL/ANON_KEY).");
+      return;
+    }
+
     if (!silent) setStatus("Aanvragen laden…");
 
     let q = supabase
@@ -135,9 +140,9 @@ export default function AdminPage() {
         body: JSON.stringify({ id }),
       });
 
-      const json = await res.json().catch(() => ({}));
+      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        console.error(json);
+        console.error(j);
         setStatus("Fout bij goedkeuren.");
         setBusyId(null);
         return;
@@ -181,8 +186,12 @@ export default function AdminPage() {
           </div>
 
           <div className="topRight">
-            <span className="chip chipSoft" title="Status">{status}</span>
-            <button className="btn btnSoft" onClick={() => load(false)}>Refresh</button>
+            <span className="chip chipSoft" title="Status">
+              {status}
+            </span>
+            <button className="btn btnSoft" onClick={() => load(false)}>
+              Refresh
+            </button>
           </div>
         </div>
 
@@ -231,9 +240,7 @@ export default function AdminPage() {
 
         <section className="list">
           {visibleRows.length === 0 ? (
-            <div className="emptyCard">
-              Geen aanvraag gevonden.
-            </div>
+            <div className="emptyCard">Geen aanvraag gevonden.</div>
           ) : (
             visibleRows.map((r: any) => {
               const toestel = [r.brand || "", r.model || "", r.color ? `(${r.color})` : ""].join(" ").trim();
@@ -246,7 +253,6 @@ export default function AdminPage() {
                   ? { cls: "badge badgeOk", label: "Goedgekeurd" }
                   : { cls: "badge badgeWarn", label: "Openstaand" };
 
-
               return (
                 <details key={r.id} className="card">
                   <summary className="cardSum">
@@ -255,6 +261,9 @@ export default function AdminPage() {
                         <div className="name">{r.customer_name || "Aanvraag"}</div>
                         <div className="badges">
                           <span className={statusBadge.cls}>{statusBadge.label}</span>
+                          {/* newness badge (optioneel) */}
+                          {newness === "new" ? <span className="badge badgeNew">Nieuw</span> : null}
+                          {newness === "used" ? <span className="badge badgeUsed">Gebruikt</span> : null}
                         </div>
                       </div>
 
@@ -277,14 +286,19 @@ export default function AdminPage() {
                       ) : (
                         <button
                           className="btn btnPrimary"
-                          onClick={(e) => { e.preventDefault(); approve(r.id); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            approve(r.id);
+                          }}
                           disabled={busyId === r.id}
                         >
                           {busyId === r.id ? "Bezig…" : "Goedkeuren"}
                         </button>
                       )}
 
-                      <span className="chev" aria-hidden="true">▾</span>
+                      <span className="chev" aria-hidden="true">
+                        ▾
+                      </span>
                     </div>
                   </summary>
 
@@ -338,14 +352,12 @@ export default function AdminPage() {
 
 const styles = `
 :root{
-  /* Lichter thema */
   --bg: #F6F8FC;
   --card: #FFFFFF;
   --line: #E6ECF5;
   --text: #0B1320;
   --muted: #0066ffff;
 
-  /* GSM-ish (licht) */
   --brand: #1E63FF;
   --brandSoft: rgba(30,99,255,0.10);
   --brandLine: rgba(30,99,255,0.18);
@@ -374,7 +386,6 @@ body{
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-/* voorkomt “buiten scherm” */
 .wrap{ min-height:100vh; overflow-x:hidden; }
 
 .topbar{
@@ -510,16 +521,17 @@ body{
   justify-content:space-between;
   margin: 4px 0 10px;
 }
-.muted{ color: var(--muted); 
-font-size: 1.1rem;
-font-weight: 700; }
+.muted{
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
 
 .list{
   display:grid;
   gap: 10px;
 }
 
-/* Accordion cards */
 .card{
   border: 1px solid var(--line);
   background: var(--card);
@@ -630,7 +642,6 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
 .badgeWarn{ border-color: rgba(245,158,11,0.25); background: var(--warnSoft); color: #7A4A00; }
 .badgeNew{ border-color: rgba(37,99,235,0.25); background: var(--newSoft); color: #0B2E9E; }
 .badgeUsed{ border-color: rgba(14,165,233,0.25); background: var(--usedSoft); color: #045B7C; }
-.badgeNeutral{ background: #F3F6FB; color: var(--muted); }
 
 .chip{
   display:inline-flex;
