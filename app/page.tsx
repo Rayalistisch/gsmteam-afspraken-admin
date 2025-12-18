@@ -343,7 +343,7 @@ const styles = `
   --card: #FFFFFF;
   --line: #E6ECF5;
   --text: #0B1320;
-  --muted: #5A6B85;
+  --muted: #0066ffff;
 
   /* GSM-ish (licht) */
   --brand: #1E63FF;
@@ -510,7 +510,9 @@ body{
   justify-content:space-between;
   margin: 4px 0 10px;
 }
-.muted{ color: var(--muted); font-size: 13px; }
+.muted{ color: var(--muted); 
+font-size: 1.1rem;
+font-weight: 700; }
 
 .list{
   display:grid;
@@ -565,7 +567,7 @@ body{
   line-height: 1.3;
 }
 .dot{ opacity: 0.5; }
-.strong{ color: var(--text); font-weight: 800; }
+.strong{ color: var(--text); font-weight: 800; font-size: 1.1rem; }
 .mono{ font-variant-numeric: tabular-nums; }
 
 .right{
@@ -609,6 +611,7 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   font-size: 14px;
   color: var(--text);
   word-break: break-word;
+  font-weight: 800;
 }
 .pre{ white-space: pre-wrap; }
 
