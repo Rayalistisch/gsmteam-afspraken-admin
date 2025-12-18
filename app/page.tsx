@@ -232,7 +232,7 @@ export default function AdminPage() {
         <section className="list">
           {visibleRows.length === 0 ? (
             <div className="emptyCard">
-              Geen aanvragen gevonden.
+              Geen aanvraag gevonden.
             </div>
           ) : (
             visibleRows.map((r: any) => {
