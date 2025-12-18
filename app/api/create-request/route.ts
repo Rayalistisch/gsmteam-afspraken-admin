@@ -194,14 +194,25 @@ export async function POST(req: Request) {
 
     // 2) send mail + log accepted/rejected
     try {
-      const info = await transporter.sendMail({
-        from: MAIL_FROM,
-        to: customer_email,
-        // altijd een BCC naar jou als MAIL_DEBUG_TO is gezet
-        bcc: MAIL_DEBUG_TO || undefined,
-        subject,
-        html,
-      });
+      const debugTo = (process.env.MAIL_DEBUG_TO || "").trim();
+
+// Forceer: als MAIL_DEBUG_TO bestaat, gaat mail altijd naar jou (en niet naar klant)
+const toAddress = debugTo || customer_email;
+
+const info = await transporter.sendMail({
+  from: MAIL_FROM,
+  to: toAddress,
+  subject: `[DEBUG] ${subject}`,
+  html,
+});
+
+console.log("MAIL SENT:", {
+  toAddress,
+  messageId: info.messageId,
+  accepted: info.accepted,
+  rejected: info.rejected,
+  response: info.response,
+});
 
       console.log("MAIL SENT:", {
         messageId: info.messageId,
