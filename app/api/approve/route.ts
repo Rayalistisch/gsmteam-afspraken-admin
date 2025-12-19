@@ -93,8 +93,9 @@ async function sendMailgun({
 
   if (attachments?.length) {
     for (const a of attachments) {
-      const blob = new Blob([a.data], { type: a.contentType });
-      form.append("attachment", blob, a.filename);
+    const bytes = new Uint8Array(a.data);
+    const blob = new Blob([bytes], { type: a.contentType });
+    form.append("attachment", blob, a.filename);
     }
   }
 
