@@ -112,25 +112,19 @@ export async function POST(req: Request) {
       return json(req, { error: "Database error", detail: safe(error?.message) }, 500);
     }
 
-    // --- MAIL ---
-    const secure = SMTP_PORT === 465;
+const secure = SMTP_PORT === 465;
 
-    const transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure, // 465 true, 587 false (STARTTLS)
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure, // 465 true, 587 false (STARTTLS)
+  auth: { user: SMTP_USER, pass: SMTP_PASS },
 
-      // Belangrijk: op sommige hosts geeft TLS chain gedoe; hiermee voorkom je harde fail.
-      // (Als dit het oplost: later netjes oplossen met juiste SMTP host/cert.)
-      tls: {
-        rejectUnauthorized: false,
-      },
-
-      connectionTimeout: 15_000,
-      greetingTimeout: 15_000,
-      socketTimeout: 20_000,
-    });
+  // timeouts ok
+  connectionTimeout: 15_000,
+  greetingTimeout: 15_000,
+  socketTimeout: 20_000,
+});
 
     // 1) verify SMTP zodat je direct foutmelding krijgt als login/poort fout is
     try {
