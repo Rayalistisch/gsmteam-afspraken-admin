@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import nodemailer from "nodemailer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,14 +17,12 @@ function getOrigin(req: Request) {
 
 function corsHeaders(req: Request) {
   const origin = getOrigin(req);
-
   const base: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Credentials": "true",
-    "Vary": "Origin",
+    Vary: "Origin",
   };
-
   if (origin) base["Access-Control-Allow-Origin"] = origin;
   return base;
 }
@@ -48,11 +45,46 @@ function requireEnv(name: string) {
   return v;
 }
 
-// simpele helper: voorkomt dat je “from” random tekst is
-function formatFrom(from: string) {
-  // als er al "<...>" in zit, laat staan
-  if (from.includes("<") && from.includes(">")) return from;
-  return `GSM Team <${from}>`;
+async function sendMailgun({
+  apiKey,
+  domain,
+  region,
+  from,
+  to,
+  subject,
+  html,
+}: {
+  apiKey: string;
+  domain: string;
+  region: "eu" | "us";
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}) {
+  const baseUrl = region === "eu" ? "https://api.eu.mailgun.net" : "https://api.mailgun.net";
+  const url = `${baseUrl}/v3/${domain}/messages`;
+
+  const form = new URLSearchParams();
+  form.append("from", from);
+  form.append("to", to);
+  form.append("subject", subject);
+  form.append("html", html);
+
+  const auth = Buffer.from(`api:${apiKey}`).toString("base64");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Mailgun error ${res.status}: ${text}`);
+  return text;
 }
 
 export async function POST(req: Request) {
@@ -61,19 +93,17 @@ export async function POST(req: Request) {
     const SUPABASE_URL = requireEnv("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 
-    const SMTP_HOST = requireEnv("SMTP_HOST");
-    const SMTP_PORT = Number(process.env.SMTP_PORT || "465");
-    const SMTP_USER = requireEnv("SMTP_USER");
-    const SMTP_PASS = requireEnv("SMTP_PASS");
+    const MAILGUN_API_KEY = requireEnv("MAILGUN_API_KEY");
+    const MAILGUN_DOMAIN = requireEnv("MAILGUN_DOMAIN");
+    const MAILGUN_REGION = (process.env.MAILGUN_REGION || "us") as "eu" | "us";
+    const MAIL_FROM =
+      (process.env.MAIL_FROM || `GSM Team <postmaster@${MAILGUN_DOMAIN}>`).trim();
 
-    // optioneel: stuur altijd een kopie naar jezelf om te checken of SMTP werkt
+    // optioneel: als gevuld, stuur alles naar jou
     const MAIL_DEBUG_TO = (process.env.MAIL_DEBUG_TO || "").trim();
 
-    // belangrijk: from moet meestal matchen met SMTP_USER / domein
-    const MAIL_FROM = formatFrom((process.env.MAIL_FROM || SMTP_USER).trim());
-
     // --- BODY ---
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
 
     const customer_email = safe(body.customer_email).trim();
     const customer_name = safe(body.customer_name).trim();
@@ -112,39 +142,7 @@ export async function POST(req: Request) {
       return json(req, { error: "Database error", detail: safe(error?.message) }, 500);
     }
 
-const secure = SMTP_PORT === 465;
-
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure, // 465 true, 587 false (STARTTLS)
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
-
-  // timeouts ok
-  connectionTimeout: 15_000,
-  greetingTimeout: 15_000,
-  socketTimeout: 20_000,
-});
-
-    // 1) verify SMTP zodat je direct foutmelding krijgt als login/poort fout is
-    try {
-      await transporter.verify();
-      console.log("SMTP verify OK", { host: SMTP_HOST, port: SMTP_PORT, secure });
-    } catch (verifyErr: any) {
-      console.error("SMTP verify FAILED:", verifyErr);
-      return json(
-        req,
-        {
-          ok: true,
-          id: data.id,
-          mail_sent: false,
-          stage: "smtp_verify",
-          mail_error: safe(verifyErr?.message || "SMTP verify failed"),
-        },
-        200
-      );
-    }
-
+    // --- EMAIL CONTENT ---
     const toestel = [insertPayload.brand, insertPayload.model, insertPayload.color]
       .filter(Boolean)
       .join(" ")
@@ -186,46 +184,33 @@ const transporter = nodemailer.createTransport({
       </div>
     `;
 
-    // 2) send mail + log accepted/rejected
+    // --- SEND VIA MAILGUN ---
     try {
-      const debugTo = (process.env.MAIL_DEBUG_TO || "").trim();
+      const toAddress = MAIL_DEBUG_TO || customer_email;
 
-// Forceer: als MAIL_DEBUG_TO bestaat, gaat mail altijd naar jou (en niet naar klant)
-const toAddress = debugTo || customer_email;
-
-const info = await transporter.sendMail({
-  from: MAIL_FROM,
-  to: toAddress,
-  subject: `[DEBUG] ${subject}`,
-  html,
-});
-
-console.log("MAIL SENT:", {
-  toAddress,
-  messageId: info.messageId,
-  accepted: info.accepted,
-  rejected: info.rejected,
-  response: info.response,
-});
-
-      console.log("MAIL SENT:", {
-        messageId: info.messageId,
-        accepted: info.accepted,
-        rejected: info.rejected,
-        response: info.response,
+      const resp = await sendMailgun({
+        apiKey: MAILGUN_API_KEY,
+        domain: MAILGUN_DOMAIN,
+        region: MAILGUN_REGION,
+        from: MAIL_FROM,
+        to: toAddress,
+        subject: MAIL_DEBUG_TO ? `[DEBUG] ${subject}` : subject,
+        html,
       });
 
-      return json(req, { ok: true, id: data.id, mail_sent: true, mail: { accepted: info.accepted, rejected: info.rejected } }, 200);
+      console.log("MAILGUN SENT:", { toAddress, resp });
+
+      return json(req, { ok: true, id: data.id, mail_sent: true }, 200);
     } catch (mailErr: any) {
-      console.error("Mail send error:", mailErr);
+      console.error("MAILGUN SEND ERROR:", mailErr);
       return json(
         req,
         {
           ok: true,
           id: data.id,
           mail_sent: false,
-          stage: "send_mail",
-          mail_error: safe(mailErr?.message || "Mail error"),
+          stage: "send_mailgun",
+          mail_error: safe(mailErr?.message || "Mailgun error"),
         },
         200
       );
