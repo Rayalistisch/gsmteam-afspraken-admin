@@ -56,6 +56,13 @@ function buildSupabaseClient(): SupabaseClient | null {
   return createClient(url, key);
 }
 
+type Draft = {
+  price_text: string;
+  preferred_date: string;
+  preferred_time: string;
+  notes: string;
+};
+
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [filter, setFilter] = useState<"pending" | "approved" | "all">("pending");
@@ -63,6 +70,15 @@ export default function AdminPage() {
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // edit state
+  const [editId, setEditId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>({
+    price_text: "",
+    preferred_date: "",
+    preferred_time: "",
+    notes: "",
+  });
 
   const supabase = useMemo(() => buildSupabaseClient(), []);
 
@@ -150,10 +166,70 @@ export default function AdminPage() {
 
       setStatus("Goedgekeurd.");
       setBusyId(null);
+      // na goedkeuren sluiten we edit-state voor de zekerheid
+      if (editId === id) cancelEdit();
       load(true);
     } catch (e) {
       console.error(e);
       setStatus("Netwerkfout bij goedkeuren.");
+      setBusyId(null);
+    }
+  }
+
+  function startEdit(r: any) {
+    setEditId(r.id);
+    setDraft({
+      price_text: r.price_text || "",
+      preferred_date: r.preferred_date || "",
+      preferred_time: r.preferred_time || "",
+      notes: r.notes || "",
+    });
+    setStatus("Bewerken… (pas prijs/datum/tijd/notitie aan en klik Opslaan)");
+  }
+
+  function cancelEdit() {
+    setEditId(null);
+    setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "" });
+    setStatus("Bewerken geannuleerd.");
+  }
+
+  async function saveEdit(id: string) {
+    // kleine UX check: niets ingevuld?
+    if (
+      draft.price_text.trim() === "" &&
+      draft.preferred_date.trim() === "" &&
+      draft.preferred_time.trim() === "" &&
+      draft.notes.trim() === ""
+    ) {
+      if (!confirm("Alles is leeg. Wil je dit toch opslaan?")) return;
+    }
+
+    setBusyId(id);
+    setStatus("Opslaan…");
+
+    try {
+      const res = await fetch("/api/update-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, patch: draft }),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) {
+        console.error(j);
+        setStatus("Fout bij opslaan.");
+        setBusyId(null);
+        return;
+      }
+
+      setStatus("Opgeslagen.");
+      setBusyId(null);
+      setEditId(null);
+      setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "" });
+      load(true);
+    } catch (e) {
+      console.error(e);
+      setStatus("Netwerkfout bij opslaan.");
       setBusyId(null);
     }
   }
@@ -236,6 +312,12 @@ export default function AdminPage() {
           <div className="muted">
             {visibleRows.length} zichtbaar / {rows.length} totaal
           </div>
+
+          {editId ? (
+            <div className="hint">
+              Tip: als een tijdstip niet kan, zet het alternatief in <strong>Notities</strong> (bijv. “Voorstel: 15:30”).
+            </div>
+          ) : null}
         </div>
 
         <section className="list">
@@ -253,17 +335,19 @@ export default function AdminPage() {
                   ? { cls: "badge badgeOk", label: "Goedgekeurd" }
                   : { cls: "badge badgeWarn", label: "Openstaand" };
 
+              const isEditing = editId === r.id;
+
               return (
-                <details key={r.id} className="card">
+                <details key={r.id} className={cx("card", isEditing && "cardEditing")}>
                   <summary className="cardSum">
                     <div className="left">
                       <div className="titleRow">
                         <div className="name">{r.customer_name || "Aanvraag"}</div>
                         <div className="badges">
                           <span className={statusBadge.cls}>{statusBadge.label}</span>
-                          {/* newness badge (optioneel) */}
                           {newness === "new" ? <span className="badge badgeNew">Nieuw</span> : null}
                           {newness === "used" ? <span className="badge badgeUsed">Gebruikt</span> : null}
+                          {isEditing ? <span className="badge badgeEdit">Bewerken</span> : null}
                         </div>
                       </div>
 
@@ -281,19 +365,59 @@ export default function AdminPage() {
                     </div>
 
                     <div className="right">
-                      {r.status === "approved" ? (
-                        <span className="chip chipOk">✔ Klaar</span>
+                      {isEditing ? (
+                        <>
+                          <button
+                            className="btn btnSoft"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              cancelEdit();
+                            }}
+                            disabled={busyId === r.id}
+                          >
+                            Annuleren
+                          </button>
+
+                          <button
+                            className="btn btnPrimary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              saveEdit(r.id);
+                            }}
+                            disabled={busyId === r.id}
+                          >
+                            {busyId === r.id ? "Bezig…" : "Opslaan"}
+                          </button>
+                        </>
                       ) : (
-                        <button
-                          className="btn btnPrimary"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            approve(r.id);
-                          }}
-                          disabled={busyId === r.id}
-                        >
-                          {busyId === r.id ? "Bezig…" : "Goedkeuren"}
-                        </button>
+                        <>
+                          <button
+                            className="btn btnSoft"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              // als je al aan het editen bent: eerst cancel
+                              if (editId) cancelEdit();
+                              startEdit(r);
+                            }}
+                          >
+                            Bewerken
+                          </button>
+
+                          {r.status === "approved" ? (
+                            <span className="chip chipOk">✔ Klaar</span>
+                          ) : (
+                            <button
+                              className="btn btnPrimary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                approve(r.id);
+                              }}
+                              disabled={busyId === r.id}
+                            >
+                              {busyId === r.id ? "Bezig…" : "Goedkeuren"}
+                            </button>
+                          )}
+                        </>
                       )}
 
                       <span className="chev" aria-hidden="true">
@@ -315,8 +439,45 @@ export default function AdminPage() {
                       </div>
 
                       <div className="field">
-                        <div className="label">Richtprijs</div>
-                        <div className="value mono">{r.price_text || "-"}</div>
+                        <div className="label">Datum (aanpassen)</div>
+                        {isEditing ? (
+                          <input
+                            className="input"
+                            value={draft.preferred_date}
+                            onChange={(e) => setDraft((d) => ({ ...d, preferred_date: e.target.value }))}
+                            placeholder="YYYY-MM-DD"
+                          />
+                        ) : (
+                          <div className="value mono">{r.preferred_date || "-"}</div>
+                        )}
+                      </div>
+
+                      <div className="field">
+                        <div className="label">Tijd (aanpassen)</div>
+                        {isEditing ? (
+                          <input
+                            className="input"
+                            value={draft.preferred_time}
+                            onChange={(e) => setDraft((d) => ({ ...d, preferred_time: e.target.value }))}
+                            placeholder="bijv. 14:30"
+                          />
+                        ) : (
+                          <div className="value mono">{r.preferred_time || "-"}</div>
+                        )}
+                      </div>
+
+                      <div className="field">
+                        <div className="label">Richtprijs (aanpassen)</div>
+                        {isEditing ? (
+                          <input
+                            className="input"
+                            value={draft.price_text}
+                            onChange={(e) => setDraft((d) => ({ ...d, price_text: e.target.value }))}
+                            placeholder="Bijv. €79 of Op aanvraag"
+                          />
+                        ) : (
+                          <div className="value mono">{r.price_text || "-"}</div>
+                        )}
                       </div>
 
                       <div className="field">
@@ -335,8 +496,17 @@ export default function AdminPage() {
                       </div>
 
                       <div className="field full">
-                        <div className="label">Notities</div>
-                        <div className="value pre">{r.notes || "-"}</div>
+                        <div className="label">Notities / Opmerking (intern)</div>
+                        {isEditing ? (
+                          <textarea
+                            className="textarea"
+                            value={draft.notes}
+                            onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+                            placeholder="Bijv. alternatief tijdstip: 15:30 / klant gebeld / prijs besproken…"
+                          />
+                        ) : (
+                          <div className="value pre">{r.notes || "-"}</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -373,6 +543,9 @@ const styles = `
 
   --used: #0EA5E9;
   --usedSoft: rgba(14,165,233,0.10);
+
+  --edit: #7C3AED;
+  --editSoft: rgba(124,58,237,0.10);
 
   --shadow: 0 12px 28px rgba(16,24,40,0.08);
 }
@@ -517,14 +690,23 @@ body{
 
 .metaRow{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
+  gap:10px;
   margin: 4px 0 10px;
 }
 .muted{
   color: var(--muted);
   font-size: 1.1rem;
   font-weight: 700;
+}
+.hint{
+  font-size: 12px;
+  color: rgba(90,107,133,0.95);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
 }
 
 .list{
@@ -538,6 +720,10 @@ body{
   border-radius: 16px;
   box-shadow: var(--shadow);
   overflow:hidden;
+}
+
+.cardEditing{
+  outline: 3px solid rgba(124,58,237,0.16);
 }
 
 .cardSum{
@@ -627,6 +813,23 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
 }
 .pre{ white-space: pre-wrap; }
 
+.input, .textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 800;
+  color: var(--text);
+  background:#fff;
+  outline:none;
+}
+.textarea{ min-height: 90px; resize: vertical; }
+.input:focus, .textarea:focus{
+  box-shadow: 0 0 0 4px rgba(30,99,255,0.14);
+  border-color: rgba(30,99,255,0.35);
+}
+
 .badge{
   display:inline-flex;
   align-items:center;
@@ -642,6 +845,7 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
 .badgeWarn{ border-color: rgba(245,158,11,0.25); background: var(--warnSoft); color: #7A4A00; }
 .badgeNew{ border-color: rgba(37,99,235,0.25); background: var(--newSoft); color: #0B2E9E; }
 .badgeUsed{ border-color: rgba(14,165,233,0.25); background: var(--usedSoft); color: #045B7C; }
+.badgeEdit{ border-color: rgba(124,58,237,0.25); background: var(--editSoft); color: #3A1A8A; }
 
 .chip{
   display:inline-flex;
@@ -692,5 +896,6 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   .grid{ grid-template-columns: 1fr; }
   .rightControls{ width:100%; justify-content:space-between; }
   .searchWrap{ max-width: none; }
+  .hint{ display:none; }
 }
 `;
