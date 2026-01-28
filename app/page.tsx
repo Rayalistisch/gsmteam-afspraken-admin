@@ -25,24 +25,10 @@ function getNewness(row: any): "new" | "used" | "unknown" {
     .join(" ")
     .toLowerCase();
 
-  if (
-    hay.includes("nieuw") ||
-    hay.includes("nieuw in doos") ||
-    hay.includes("sealed") ||
-    hay.includes("ongebruikt") ||
-    hay.includes("new")
-  )
+  if (hay.includes("nieuw") || hay.includes("nieuw in doos") || hay.includes("sealed") || hay.includes("ongebruikt") || hay.includes("new"))
     return "new";
 
-  if (
-    hay.includes("gebruikt") ||
-    hay.includes("tweedehands") ||
-    hay.includes("refurb") ||
-    hay.includes("refurbished") ||
-    hay.includes("used") ||
-    hay.includes("b-grade") ||
-    hay.includes("c-grade")
-  )
+  if (hay.includes("gebruikt") || hay.includes("tweedehands") || hay.includes("refurb") || hay.includes("refurbished") || hay.includes("used") || hay.includes("b-grade") || hay.includes("c-grade"))
     return "used";
 
   return "unknown";
@@ -65,7 +51,7 @@ type Draft = {
 
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [filter, setFilter] = useState<"pending" | "approved" | "all">("pending");
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [status, setStatus] = useState("Laden…");
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -166,12 +152,45 @@ export default function AdminPage() {
 
       setStatus("Goedgekeurd.");
       setBusyId(null);
-      // na goedkeuren sluiten we edit-state voor de zekerheid
       if (editId === id) cancelEdit();
       load(true);
     } catch (e) {
       console.error(e);
       setStatus("Netwerkfout bij goedkeuren.");
+      setBusyId(null);
+    }
+  }
+
+  async function reject(id: string) {
+    const reason = prompt("Waarom afwijzen? (optioneel)\nTip: zet ook een alternatief tijdstip/datum in de reden.");
+    if (reason === null) return;
+    if (!confirm("Weet je zeker dat je deze aanvraag wilt afwijzen?")) return;
+
+    setBusyId(id);
+    setStatus("Afwijzen…");
+
+    try {
+      const res = await fetch("/api/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, reason: (reason || "").trim() }),
+      });
+
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j?.ok) {
+        console.error(j);
+        setStatus("Fout bij afwijzen.");
+        setBusyId(null);
+        return;
+      }
+
+      setStatus("Afgewezen.");
+      setBusyId(null);
+      if (editId === id) cancelEdit();
+      load(true);
+    } catch (e) {
+      console.error(e);
+      setStatus("Netwerkfout bij afwijzen.");
       setBusyId(null);
     }
   }
@@ -194,16 +213,6 @@ export default function AdminPage() {
   }
 
   async function saveEdit(id: string) {
-    // kleine UX check: niets ingevuld?
-    if (
-      draft.price_text.trim() === "" &&
-      draft.preferred_date.trim() === "" &&
-      draft.preferred_time.trim() === "" &&
-      draft.notes.trim() === ""
-    ) {
-      if (!confirm("Alles is leeg. Wil je dit toch opslaan?")) return;
-    }
-
     setBusyId(id);
     setStatus("Opslaan…");
 
@@ -250,7 +259,6 @@ export default function AdminPage() {
     <div className="wrap">
       <style>{styles}</style>
 
-      {/* Topbar */}
       <header className="topbar">
         <div className="topbarInner">
           <div className="brand">
@@ -272,12 +280,15 @@ export default function AdminPage() {
         </div>
 
         <div className="controls">
-          <div className="segmented">
+          <div className="segmented" role="tablist" aria-label="Filters">
             <button className={cx("segBtn", filter === "pending" && "segActive")} onClick={() => setFilter("pending")}>
               Openstaand
             </button>
             <button className={cx("segBtn", filter === "approved" && "segActive")} onClick={() => setFilter("approved")}>
               Goedgekeurd
+            </button>
+            <button className={cx("segBtn", filter === "rejected" && "segActive")} onClick={() => setFilter("rejected")}>
+              Afgewezen
             </button>
             <button className={cx("segBtn", filter === "all" && "segActive")} onClick={() => setFilter("all")}>
               Alles
@@ -312,12 +323,6 @@ export default function AdminPage() {
           <div className="muted">
             {visibleRows.length} zichtbaar / {rows.length} totaal
           </div>
-
-          {editId ? (
-            <div className="hint">
-              Tip: als een tijdstip niet kan, zet het alternatief in <strong>Notities</strong> (bijv. “Voorstel: 15:30”).
-            </div>
-          ) : null}
         </div>
 
         <section className="list">
@@ -333,6 +338,8 @@ export default function AdminPage() {
               const statusBadge =
                 r.status === "approved"
                   ? { cls: "badge badgeOk", label: "Goedgekeurd" }
+                  : r.status === "rejected"
+                  ? { cls: "badge badgeBad", label: "Afgewezen" }
                   : { cls: "badge badgeWarn", label: "Openstaand" };
 
               const isEditing = editId === r.id;
@@ -358,7 +365,7 @@ export default function AdminPage() {
                         {r.issue ? (
                           <>
                             <span className="dot">•</span>
-                            <span className="muted">{r.issue}</span>
+                            <span className="mutedText">{r.issue}</span>
                           </>
                         ) : null}
                       </div>
@@ -366,7 +373,7 @@ export default function AdminPage() {
 
                     <div className="right">
                       {isEditing ? (
-                        <>
+                        <div className="actions">
                           <button
                             className="btn btnSoft"
                             onClick={(e) => {
@@ -388,14 +395,13 @@ export default function AdminPage() {
                           >
                             {busyId === r.id ? "Bezig…" : "Opslaan"}
                           </button>
-                        </>
+                        </div>
                       ) : (
-                        <>
+                        <div className="actions">
                           <button
                             className="btn btnSoft"
                             onClick={(e) => {
                               e.preventDefault();
-                              // als je al aan het editen bent: eerst cancel
                               if (editId) cancelEdit();
                               startEdit(r);
                             }}
@@ -405,19 +411,34 @@ export default function AdminPage() {
 
                           {r.status === "approved" ? (
                             <span className="chip chipOk">✔ Klaar</span>
+                          ) : r.status === "rejected" ? (
+                            <span className="chip chipBad">✖ Afgewezen</span>
                           ) : (
-                            <button
-                              className="btn btnPrimary"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                approve(r.id);
-                              }}
-                              disabled={busyId === r.id}
-                            >
-                              {busyId === r.id ? "Bezig…" : "Goedkeuren"}
-                            </button>
+                            <>
+                              <button
+                                className="btn btnBad"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  reject(r.id);
+                                }}
+                                disabled={busyId === r.id}
+                              >
+                                {busyId === r.id ? "Bezig…" : "Afwijzen"}
+                              </button>
+
+                              <button
+                                className="btn btnPrimary"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  approve(r.id);
+                                }}
+                                disabled={busyId === r.id}
+                              >
+                                {busyId === r.id ? "Bezig…" : "Goedkeuren"}
+                              </button>
+                            </>
                           )}
-                        </>
+                        </div>
                       )}
 
                       <span className="chev" aria-hidden="true">
@@ -481,18 +502,8 @@ export default function AdminPage() {
                       </div>
 
                       <div className="field">
-                        <div className="label">Conditie</div>
-                        <div className="value">{r.condition || "-"}</div>
-                      </div>
-
-                      <div className="field">
                         <div className="label">Kwaliteit</div>
                         <div className="value">{r.quality || "-"}</div>
-                      </div>
-
-                      <div className="field">
-                        <div className="label">Garantie</div>
-                        <div className="value">{r.warranty || "-"}</div>
                       </div>
 
                       <div className="field full">
@@ -522,29 +533,33 @@ export default function AdminPage() {
 
 const styles = `
 :root{
-  --bg: #F6F8FC;
-  --card: #FFFFFF;
-  --line: #E6ECF5;
-  --text: #0B1320;
-  --muted: #0066ffff;
+  --bg:#F6F8FC;
+  --card:#FFFFFF;
+  --line:#E6ECF5;
+  --text:#0B1320;
 
-  --brand: #1E63FF;
+  --muted:#54657A;
+
+  --brand:#1E63FF;
   --brandSoft: rgba(30,99,255,0.10);
   --brandLine: rgba(30,99,255,0.18);
 
-  --ok: #16A34A;
+  --ok:#16A34A;
   --okSoft: rgba(22,163,74,0.10);
 
-  --warn: #F59E0B;
+  --warn:#F59E0B;
   --warnSoft: rgba(245,158,11,0.12);
 
-  --new: #2563EB;
+  --bad:#DC2626;
+  --badSoft: rgba(220,38,38,0.10);
+
+  --new:#2563EB;
   --newSoft: rgba(37,99,235,0.10);
 
-  --used: #0EA5E9;
+  --used:#0EA5E9;
   --usedSoft: rgba(14,165,233,0.10);
 
-  --edit: #7C3AED;
+  --edit:#7C3AED;
   --editSoft: rgba(124,58,237,0.10);
 
   --shadow: 0 12px 28px rgba(16,24,40,0.08);
@@ -554,8 +569,8 @@ const styles = `
 html,body{ height:100%; }
 body{
   margin:0;
-  background: var(--bg);
-  color: var(--text);
+  background:var(--bg);
+  color:var(--text);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -571,7 +586,7 @@ body{
 }
 
 .topbarInner{
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 14px 16px 10px;
   display:flex;
@@ -585,15 +600,22 @@ body{
   width:40px; height:40px; border-radius: 14px;
   background: linear-gradient(135deg, var(--brand), #52D0FF);
   box-shadow: 0 10px 22px rgba(30,99,255,0.18);
+  flex: 0 0 auto;
 }
 .brandText{ min-width:0; }
-.brandTitle{ font-weight: 900; line-height: 1.1; }
+.brandTitle{ font-weight: 950; line-height: 1.1; font-size: 15px; }
 .brandSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
 
-.topRight{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+.topRight{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
 
 .controls{
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 0 16px 14px;
   display:flex;
@@ -603,6 +625,7 @@ body{
   flex-wrap:wrap;
 }
 
+/* ✅ op mobiel: segmented scrollbaar i.p.v. proppen */
 .segmented{
   display:flex;
   gap:6px;
@@ -611,7 +634,12 @@ body{
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 8px 18px rgba(16,24,40,0.04);
+  overflow-x:auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
 }
+.segmented::-webkit-scrollbar{ height: 8px; }
+.segmented::-webkit-scrollbar-thumb{ background: rgba(0,0,0,.12); border-radius: 999px; }
 
 .segBtn{
   border:0;
@@ -619,8 +647,10 @@ body{
   padding: 9px 12px;
   border-radius: 12px;
   cursor:pointer;
-  font-weight: 800;
+  font-weight: 850;
   color: var(--muted);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .segBtn:hover{ background: #F2F6FF; color: var(--text); }
 .segActive{
@@ -653,7 +683,7 @@ body{
   position:relative;
   flex: 1;
   min-width: 220px;
-  max-width: 420px;
+  max-width: 460px;
 }
 .search{
   width:100%;
@@ -683,30 +713,21 @@ body{
 }
 
 .content{
-  max-width: 1100px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 16px;
 }
 
 .metaRow{
   display:flex;
-  align-items:flex-start;
+  align-items:center;
   justify-content:space-between;
-  gap:10px;
   margin: 4px 0 10px;
 }
 .muted{
   color: var(--muted);
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-.hint{
-  font-size: 12px;
-  color: rgba(90,107,133,0.95);
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .list{
@@ -737,10 +758,10 @@ body{
 }
 .cardSum::-webkit-details-marker{ display:none; }
 
-.left{ min-width:0; }
+.left{ min-width:0; flex: 1; }
 .titleRow{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
   gap:10px;
 }
@@ -748,10 +769,9 @@ body{
   font-weight: 950;
   font-size: 15px;
   line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
+  overflow:hidden;
   text-overflow: ellipsis;
-  max-width: 560px;
+  max-width: 680px;
 }
 .badges{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 
@@ -762,24 +782,32 @@ body{
   flex-wrap:wrap;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.35;
 }
+.mutedText{ color: var(--muted); }
 .dot{ opacity: 0.5; }
-.strong{ color: var(--text); font-weight: 800; font-size: 1.1rem; }
+.strong{ color: var(--text); font-weight: 900; }
 .mono{ font-variant-numeric: tabular-nums; }
 
 .right{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   gap:10px;
   flex-shrink: 0;
+}
+.actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
 }
 .chev{
   color: var(--muted);
   font-size: 16px;
-  transform: translateY(1px);
+  transform: translateY(2px);
 }
-details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
+details[open] .chev{ transform: rotate(180deg) translateY(-2px); }
 
 .cardBody{
   border-top: 1px solid var(--line);
@@ -799,17 +827,18 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   min-width: 0;
 }
 .field.full{ grid-column: 1 / -1; }
+
 .label{
   font-size: 12px;
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 900;
   margin-bottom: 6px;
 }
 .value{
   font-size: 14px;
   color: var(--text);
   word-break: break-word;
-  font-weight: 800;
+  font-weight: 900;
 }
 .pre{ white-space: pre-wrap; }
 
@@ -819,7 +848,7 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   border-radius: 12px;
   padding: 10px 12px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 850;
   color: var(--text);
   background:#fff;
   outline:none;
@@ -843,6 +872,7 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
 }
 .badgeOk{ border-color: rgba(22,163,74,0.25); background: var(--okSoft); color: #0B5A23; }
 .badgeWarn{ border-color: rgba(245,158,11,0.25); background: var(--warnSoft); color: #7A4A00; }
+.badgeBad{ border-color: rgba(220,38,38,0.25); background: var(--badSoft); color: #7F1D1D; }
 .badgeNew{ border-color: rgba(37,99,235,0.25); background: var(--newSoft); color: #0B2E9E; }
 .badgeUsed{ border-color: rgba(14,165,233,0.25); background: var(--usedSoft); color: #045B7C; }
 .badgeEdit{ border-color: rgba(124,58,237,0.25); background: var(--editSoft); color: #3A1A8A; }
@@ -855,10 +885,11 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   border: 1px solid var(--line);
   background: #fff;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 850;
   color: var(--muted);
 }
 .chipOk{ background: var(--okSoft); border-color: rgba(22,163,74,0.25); color: #0B5A23; }
+.chipBad{ background: var(--badSoft); border-color: rgba(220,38,38,0.25); color: #7F1D1D; }
 .chipSoft{ background: #fff; }
 
 .btn{
@@ -868,7 +899,7 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   padding: 9px 12px;
   border-radius: 14px;
   cursor:pointer;
-  font-weight: 900;
+  font-weight: 950;
 }
 .btn:disabled{ opacity:0.55; cursor:not-allowed; }
 
@@ -881,6 +912,14 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
 }
 .btnPrimary:hover{ filter: brightness(1.03); }
 
+.btnBad{
+  border: 0;
+  background: linear-gradient(135deg, #DC2626, #FB7185);
+  color:#fff;
+  box-shadow: 0 12px 22px rgba(220,38,38,0.18);
+}
+.btnBad:hover{ filter: brightness(1.03); }
+
 .emptyCard{
   border: 1px dashed var(--line);
   background: #fff;
@@ -890,12 +929,50 @@ details[open] .chev{ transform: rotate(180deg) translateY(-1px); }
   text-align:center;
 }
 
-@media (max-width: 720px){
-  .topRight .chip{ display:none; }
-  .name{ max-width: 240px; }
+/* ✅ Responsive: eerder naar 1 kolom + knoppen stacken */
+@media (max-width: 980px){
   .grid{ grid-template-columns: 1fr; }
-  .rightControls{ width:100%; justify-content:space-between; }
-  .searchWrap{ max-width: none; }
-  .hint{ display:none; }
+  .name{ max-width: 100%; }
+}
+
+@media (max-width: 720px){
+  .topbarInner{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .topRight{
+    justify-content: space-between;
+    width: 100%;
+  }
+  .controls{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rightControls{
+    width:100%;
+    justify-content:space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .searchWrap{ max-width: none; min-width: 0; }
+
+  .cardSum{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .right{
+    justify-content: space-between;
+    align-items: center;
+  }
+  .actions{
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .actions .btn, .actions .chip{
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
 }
 `;
