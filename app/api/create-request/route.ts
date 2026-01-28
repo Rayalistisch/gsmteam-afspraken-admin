@@ -118,18 +118,29 @@ export async function POST(req: Request) {
     });
 
     const insertPayload = {
-      customer_name,
-      customer_email,
-      customer_phone: safe(body.customer_phone).trim(),
-      brand: safe(body.brand).trim(),
-      model: safe(body.model).trim(),
-      color: safe(body.color).trim(),
-      issue: safe(body.issue).trim(),
-      price_text: safe(body.price_text).trim(),
-      preferred_date: safe(body.preferred_date).trim(),
-      preferred_time: safe(body.preferred_time).trim(),
-      status: "pending" as const,
-    };
+  customer_name,
+  customer_email,
+  customer_phone: safe(body.customer_phone).trim(),
+
+  brand: safe(body.brand).trim(),
+  model: safe(body.model).trim(),
+  color: safe(body.color).trim(),
+
+  issue: safe(body.issue).trim(),
+  quality: safe(body.quality).trim(),          // ✅ FIX: quality opslaan
+  // condition: safe(body.condition).trim(),   // optioneel als je dat ook ooit meestuurt
+
+  price_text: safe(body.price_text).trim(),
+
+  preferred_date: safe(body.preferred_date).trim(),
+  preferred_time: safe(body.preferred_time).trim(),
+
+  notes: safe(body.notes).trim(),              // ✅ aanrader: jouw Shopify stuurt notes wél mee
+  // items: body.items ?? null,                // optioneel (als je kolom items hebt)
+  // price_total_text: safe(body.price_total_text).trim(), // optioneel
+
+  status: "pending" as const,
+};
 
     const { data, error } = await supabaseAdmin
       .from("repair_requests")
@@ -160,7 +171,7 @@ export async function POST(req: Request) {
         <div style="padding:18px 18px;border:1px solid #e6ecf5;border-radius:14px;background:#ffffff">
           <h2 style="margin:0 0 10px 0;">Bevestiging reparatie-aanvraag</h2>
           <p style="margin:0 0 14px 0;color:#444">
-            Bedankt${customer_name ? " " + safe(customer_name) : ""}! We hebben je aanvraag ontvangen.
+            Bedankt${customer_name ? " " + safe(customer_name) : ""}! We hebben jouw aanvraag ontvangen.
           </p>
 
           <div style="padding:12px 14px;border-radius:12px;background:#f6f8fc;border:1px solid #e6ecf5">
