@@ -49,6 +49,41 @@ type Draft = {
   notes: string;
 };
 
+/* SVG icon components */
+const IconClock = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+  </svg>
+);
+const IconX = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+  </svg>
+);
+const IconList = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+  </svg>
+);
+const IconSearch = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+const filterConfig = [
+  { key: "pending" as const, label: "Openstaand", shortLabel: "Open", Icon: IconClock },
+  { key: "approved" as const, label: "Goedgekeurd", shortLabel: "Goed", Icon: IconCheck },
+  { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afwijs", Icon: IconX },
+  { key: "all" as const, label: "Alles", shortLabel: "Alles", Icon: IconList },
+];
+
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
@@ -56,6 +91,7 @@ export default function AdminPage() {
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mobileSearch, setMobileSearch] = useState(false);
 
   // edit state
   const [editId, setEditId] = useState<string | null>(null);
@@ -259,58 +295,128 @@ export default function AdminPage() {
     <div className="wrap">
       <style>{styles}</style>
 
+      {/* ====== MOBILE HEADER ====== */}
+      <header className="mobileHeader">
+        <div className="mhLeft">
+          <div className="mhLogo" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/>
+            </svg>
+          </div>
+          <span className="mhTitle">GSM Team</span>
+        </div>
+        <div className="mhRight">
+          <span className="mhStatus">
+            <span className="statusDot" />
+            {rows.length}
+          </span>
+          <button className="mhBtn" onClick={() => setMobileSearch(!mobileSearch)} aria-label="Zoeken">
+            <IconSearch />
+          </button>
+          <button className="mhBtn" onClick={() => load(false)} aria-label="Vernieuwen">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* ====== MOBILE SEARCH BAR (toggle) ====== */}
+      {mobileSearch && (
+        <div className="mobileSearchBar">
+          <div className="mobileSearchInner">
+            <svg className="searchIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              className="mobileSearchInput"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Zoek op naam, toestel, mail…"
+              autoFocus
+            />
+            {query ? (
+              <button className="clearBtn" onClick={() => setQuery("")} aria-label="Wis">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            ) : (
+              <button className="clearBtn" onClick={() => setMobileSearch(false)} aria-label="Sluiten">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ====== DESKTOP HEADER ====== */}
       <header className="topbar">
         <div className="topbarInner">
           <div className="brand">
-            <div className="logo" aria-hidden="true" />
+            <div className="logo" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/>
+              </svg>
+            </div>
             <div className="brandText">
               <div className="brandTitle">GSM Team</div>
-              <div className="brandSub">Afspraken • Beheer</div>
+              <div className="brandSub">Afspraken beheer</div>
             </div>
           </div>
 
           <div className="topRight">
-            <span className="chip chipSoft" title="Status">
+            <span className="statusChip" title="Status">
+              <span className="statusDot" />
               {status}
             </span>
-            <button className="btn btnSoft" onClick={() => load(false)}>
-              Refresh
+            <button className="btn btnIcon" onClick={() => load(false)} title="Vernieuwen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
             </button>
           </div>
         </div>
 
         <div className="controls">
-          <div className="segmented" role="tablist" aria-label="Filters">
-            <button className={cx("segBtn", filter === "pending" && "segActive")} onClick={() => setFilter("pending")}>
-              Openstaand
-            </button>
-            <button className={cx("segBtn", filter === "approved" && "segActive")} onClick={() => setFilter("approved")}>
-              Goedgekeurd
-            </button>
-            <button className={cx("segBtn", filter === "rejected" && "segActive")} onClick={() => setFilter("rejected")}>
-              Afgewezen
-            </button>
-            <button className={cx("segBtn", filter === "all" && "segActive")} onClick={() => setFilter("all")}>
-              Alles
-            </button>
-          </div>
+          <nav className="tabs" role="tablist" aria-label="Filters">
+            {filterConfig.map(({ key, label }) => (
+              <button
+                key={key}
+                className={cx("tab", filter === key && "tabActive")}
+                onClick={() => setFilter(key)}
+                role="tab"
+                aria-selected={filter === key}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
 
           <div className="rightControls">
             <label className="toggle">
               <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-              <span>Auto-refresh</span>
+              <span className="toggleTrack"><span className="toggleThumb" /></span>
+              <span className="toggleLabel">Auto</span>
             </label>
 
             <div className="searchWrap">
+              <svg className="searchIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
               <input
                 className="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Zoek op naam, toestel, mail, notitie…"
+                placeholder="Zoeken…"
               />
               {query ? (
-                <button className="clear" onClick={() => setQuery("")} aria-label="Wis zoekterm">
-                  ×
+                <button className="clearBtn" onClick={() => setQuery("")} aria-label="Wis zoekterm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
                 </button>
               ) : null}
             </div>
@@ -318,21 +424,28 @@ export default function AdminPage() {
         </div>
       </header>
 
+      {/* ====== MAIN CONTENT ====== */}
       <main className="content">
         <div className="metaRow">
-          <div className="muted">
-            {visibleRows.length} zichtbaar / {rows.length} totaal
-          </div>
+          <span className="metaCount">{visibleRows.length}</span>
+          <span className="metaLabel">van {rows.length} aanvragen</span>
         </div>
 
         <section className="list">
           {visibleRows.length === 0 ? (
-            <div className="emptyCard">Geen aanvraag gevonden.</div>
+            <div className="emptyCard">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{opacity: 0.25}}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              <span>Geen aanvragen gevonden</span>
+            </div>
           ) : (
             visibleRows.map((r: any) => {
-              const toestel = [r.brand || "", r.model || "", r.color ? `(${r.color})` : ""].join(" ").trim();
-              const contact = `${r.customer_email || ""}${r.customer_phone ? ` / ${r.customer_phone}` : ""}`;
-              const voorkeur = `${r.preferred_date || ""}${r.preferred_time ? ` ${r.preferred_time}` : ""}`.trim();
+              const toestel = [r.brand || "", r.model || ""].filter(Boolean).join(" ").trim();
+              const contact = `${r.customer_email || ""}${r.customer_phone ? ` · ${r.customer_phone}` : ""}`;
+              const voorkeur = `${r.preferred_date || ""}${r.preferred_time ? ` om ${r.preferred_time}` : ""}`.trim();
 
               const newness = getNewness(r);
               const statusBadge =
@@ -347,10 +460,10 @@ export default function AdminPage() {
               return (
                 <details key={r.id} className={cx("card", isEditing && "cardEditing")}>
                   <summary className="cardSum">
-                    <div className="left">
-                      <div className="titleRow">
-                        <div className="name">{r.customer_name || "Aanvraag"}</div>
-                        <div className="badges">
+                    <div className="cardLeft">
+                      <div className="cardHeader">
+                        <span className="cardName">{r.customer_name || "Aanvraag"}</span>
+                        <div className="badgeGroup">
                           <span className={statusBadge.cls}>{statusBadge.label}</span>
                           {newness === "new" ? <span className="badge badgeNew">Nieuw</span> : null}
                           {newness === "used" ? <span className="badge badgeUsed">Gebruikt</span> : null}
@@ -358,24 +471,19 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      <div className="subRow">
-                        <span className="mono">{fmtNL(r.created_at)}</span>
-                        <span className="dot">•</span>
-                        <span className="strong">{toestel || "-"}</span>
-                        {r.issue ? (
-                          <>
-                            <span className="dot">•</span>
-                            <span className="mutedText">{r.issue}</span>
-                          </>
-                        ) : null}
+                      <div className="cardMeta">
+                        {toestel ? <span className="metaDevice">{toestel}</span> : null}
+                        {r.color ? <span className="metaColor">{r.color}</span> : null}
+                        {r.issue ? <span className="metaIssue">{r.issue}</span> : null}
+                        <span className="metaTime">{fmtNL(r.created_at)}</span>
                       </div>
                     </div>
 
-                    <div className="right">
+                    <div className="cardRight">
                       {isEditing ? (
                         <div className="actions">
                           <button
-                            className="btn btnSoft"
+                            className="btn btnGhost"
                             onClick={(e) => {
                               e.preventDefault();
                               cancelEdit();
@@ -384,7 +492,6 @@ export default function AdminPage() {
                           >
                             Annuleren
                           </button>
-
                           <button
                             className="btn btnPrimary"
                             onClick={(e) => {
@@ -399,24 +506,38 @@ export default function AdminPage() {
                       ) : (
                         <div className="actions">
                           <button
-                            className="btn btnSoft"
+                            className="btn btnGhost"
                             onClick={(e) => {
                               e.preventDefault();
                               if (editId) cancelEdit();
                               startEdit(r);
                             }}
                           >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
                             Bewerken
                           </button>
 
                           {r.status === "approved" ? (
-                            <span className="chip chipOk">✔ Klaar</span>
+                            <span className="chipDone">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                              Klaar
+                            </span>
                           ) : r.status === "rejected" ? (
-                            <span className="chip chipBad">✖ Afgewezen</span>
+                            <span className="chipRejected">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                              Afgewezen
+                            </span>
                           ) : (
                             <>
                               <button
-                                className="btn btnBad"
+                                className="btn btnDanger"
                                 onClick={(e) => {
                                   e.preventDefault();
                                   reject(r.id);
@@ -425,7 +546,6 @@ export default function AdminPage() {
                               >
                                 {busyId === r.id ? "Bezig…" : "Afwijzen"}
                               </button>
-
                               <button
                                 className="btn btnPrimary"
                                 onClick={(e) => {
@@ -442,25 +562,27 @@ export default function AdminPage() {
                       )}
 
                       <span className="chev" aria-hidden="true">
-                        ▾
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
                       </span>
                     </div>
                   </summary>
 
                   <div className="cardBody">
-                    <div className="grid">
-                      <div className="field">
-                        <div className="label">Contact</div>
-                        <div className="value">{contact || "-"}</div>
+                    <div className="detailGrid">
+                      <div className="detailItem">
+                        <div className="detailLabel">Contact</div>
+                        <div className="detailValue">{contact || "-"}</div>
                       </div>
 
-                      <div className="field">
-                        <div className="label">Voorkeur</div>
-                        <div className="value mono">{voorkeur || "-"}</div>
+                      <div className="detailItem">
+                        <div className="detailLabel">Voorkeursdatum</div>
+                        <div className="detailValue mono">{voorkeur || "-"}</div>
                       </div>
 
-                      <div className="field">
-                        <div className="label">Datum (aanpassen)</div>
+                      <div className="detailItem">
+                        <div className="detailLabel">Datum aanpassen</div>
                         {isEditing ? (
                           <input
                             className="input"
@@ -469,12 +591,12 @@ export default function AdminPage() {
                             placeholder="YYYY-MM-DD"
                           />
                         ) : (
-                          <div className="value mono">{r.preferred_date || "-"}</div>
+                          <div className="detailValue mono">{r.preferred_date || "-"}</div>
                         )}
                       </div>
 
-                      <div className="field">
-                        <div className="label">Tijd (aanpassen)</div>
+                      <div className="detailItem">
+                        <div className="detailLabel">Tijd aanpassen</div>
                         {isEditing ? (
                           <input
                             className="input"
@@ -483,12 +605,12 @@ export default function AdminPage() {
                             placeholder="bijv. 14:30"
                           />
                         ) : (
-                          <div className="value mono">{r.preferred_time || "-"}</div>
+                          <div className="detailValue mono">{r.preferred_time || "-"}</div>
                         )}
                       </div>
 
-                      <div className="field">
-                        <div className="label">Richtprijs (aanpassen)</div>
+                      <div className="detailItem">
+                        <div className="detailLabel">Richtprijs</div>
                         {isEditing ? (
                           <input
                             className="input"
@@ -497,17 +619,17 @@ export default function AdminPage() {
                             placeholder="Bijv. €79 of Op aanvraag"
                           />
                         ) : (
-                          <div className="value mono">{r.price_text || "-"}</div>
+                          <div className="detailValue mono">{r.price_text || "-"}</div>
                         )}
                       </div>
 
-                      <div className="field">
-                        <div className="label">Kwaliteit</div>
-                        <div className="value">{r.quality || "-"}</div>
+                      <div className="detailItem">
+                        <div className="detailLabel">Kwaliteit</div>
+                        <div className="detailValue">{r.quality || "-"}</div>
                       </div>
 
-                      <div className="field full">
-                        <div className="label">Notities / Opmerking (intern)</div>
+                      <div className="detailItem detailFull">
+                        <div className="detailLabel">Notities (intern)</div>
                         {isEditing ? (
                           <textarea
                             className="textarea"
@@ -516,7 +638,7 @@ export default function AdminPage() {
                             placeholder="Bijv. alternatief tijdstip: 15:30 / klant gebeld / prijs besproken…"
                           />
                         ) : (
-                          <div className="value pre">{r.notes || "-"}</div>
+                          <div className="detailValue pre">{r.notes || "-"}</div>
                         )}
                       </div>
                     </div>
@@ -527,452 +649,695 @@ export default function AdminPage() {
           )}
         </section>
       </main>
+
+      {/* ====== BOTTOM NAV (mobile only) ====== */}
+      <nav className="bottomNav" aria-label="Navigatie">
+        {filterConfig.map(({ key, shortLabel, Icon }) => (
+          <button
+            key={key}
+            className={cx("bnItem", filter === key && "bnActive")}
+            onClick={() => setFilter(key)}
+          >
+            <Icon />
+            <span className="bnLabel">{shortLabel}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
 
 const styles = `
-:root{
-  --bg:#F6F8FC;
-  --card:#FFFFFF;
-  --line:#E6ECF5;
-  --text:#0B1320;
-
-  --muted:#54657A;
-
-  --brand:#1E63FF;
-  --brandSoft: rgba(30,99,255,0.10);
-  --brandLine: rgba(30,99,255,0.18);
-
-  --ok:#16A34A;
-  --okSoft: rgba(22,163,74,0.10);
-
-  --warn:#F59E0B;
-  --warnSoft: rgba(245,158,11,0.12);
-
-  --bad:#DC2626;
-  --badSoft: rgba(220,38,38,0.10);
-
-  --new:#2563EB;
-  --newSoft: rgba(37,99,235,0.10);
-
-  --used:#0EA5E9;
-  --usedSoft: rgba(14,165,233,0.10);
-
-  --edit:#7C3AED;
-  --editSoft: rgba(124,58,237,0.10);
-
-  --shadow: 0 12px 28px rgba(16,24,40,0.08);
+/* ========== RESET & BASE ========== */
+*{ box-sizing:border-box; margin:0; padding:0; }
+html{
+  height:100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-
-*{ box-sizing:border-box; }
-html,body{ height:100%; }
 body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  height:100%;
+  background: #F8FAFC;
+  color: #0F172A;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overscroll-behavior-y: contain;
 }
 
-.wrap{ min-height:100vh; overflow-x:hidden; }
+.wrap{ min-height:100vh; min-height: 100dvh; }
 
+/* ========== MOBILE HEADER ========== */
+.mobileHeader{
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  align-items: center;
+  justify-content: space-between;
+}
+.mhLeft{ display: flex; align-items: center; gap: 10px; }
+.mhLogo{
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3B82F6, #06B6D4);
+  display: flex; align-items: center; justify-content: center;
+}
+.mhTitle{ font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
+.mhRight{ display: flex; align-items: center; gap: 4px; }
+.mhStatus{
+  display: flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 600; color: #64748B;
+  padding: 4px 10px;
+  background: #F1F5F9;
+  border-radius: 20px;
+  margin-right: 4px;
+}
+.mhBtn{
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #3B82F6;
+  transition: background 0.15s ease;
+  padding: 0;
+}
+.mhBtn:active{ background: rgba(59,130,246,0.08); }
+
+/* ========== MOBILE SEARCH BAR ========== */
+.mobileSearchBar{
+  display: none;
+  position: sticky;
+  top: 52px;
+  z-index: 49;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 0 16px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.mobileSearchInner{
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.mobileSearchInput{
+  width: 100%;
+  padding: 10px 38px 10px 36px;
+  border-radius: 12px;
+  border: none;
+  background: #F1F5F9;
+  font-size: 15px;
+  color: #0F172A;
+  outline: none;
+}
+.mobileSearchInput:focus{ background: #EEF2F7; }
+.mobileSearchInput::placeholder{ color: #94A3B8; }
+
+/* ========== DESKTOP TOPBAR ========== */
 .topbar{
   position: sticky;
-  top:0;
-  z-index: 20;
-  background: rgba(246,248,252,0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
+  top: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid #E2E8F0;
 }
 
 .topbarInner{
-  max-width: 1180px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 14px 16px 10px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.brand{ display:flex; align-items:center; gap:12px; min-width: 0; }
+/* ========== BRAND ========== */
+.brand{ display:flex; align-items:center; gap:12px; }
 .logo{
-  width:40px; height:40px; border-radius: 14px;
-  background: linear-gradient(135deg, var(--brand), #52D0FF);
-  box-shadow: 0 10px 22px rgba(30,99,255,0.18);
-  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3B82F6, #06B6D4);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
-.brandText{ min-width:0; }
-.brandTitle{ font-weight: 950; line-height: 1.1; font-size: 15px; }
-.brandSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+.brandText{}
+.brandTitle{
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: #0F172A;
+}
+.brandSub{
+  font-size: 12px;
+  color: #94A3B8;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
 
+/* ========== TOP RIGHT ========== */
 .topRight{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.controls{
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 0 16px 14px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  flex-wrap:wrap;
+.statusChip{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748B;
+  background: #F1F5F9;
+}
+.statusDot{
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #22C55E;
+  flex-shrink: 0;
 }
 
-/* ✅ op mobiel: segmented scrollbaar i.p.v. proppen */
-.segmented{
-  display:flex;
-  gap:6px;
-  padding: 6px;
-  border: 1px solid var(--line);
+.btnIcon{
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 8px 18px rgba(16,24,40,0.04);
-  overflow-x:auto;
-  -webkit-overflow-scrolling: touch;
-  max-width: 100%;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.15s ease;
+  padding: 0;
 }
-.segmented::-webkit-scrollbar{ height: 8px; }
-.segmented::-webkit-scrollbar-thumb{ background: rgba(0,0,0,.12); border-radius: 999px; }
+.btnIcon:hover{
+  background: #F8FAFC;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
 
-.segBtn{
-  border:0;
+/* ========== CONTROLS ========== */
+.controls{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ========== TABS (desktop) ========== */
+.tabs{
+  display: flex;
+  gap: 2px;
+  background: #F1F5F9;
+  padding: 3px;
+  border-radius: 10px;
+}
+.tab{
+  border: 0;
   background: transparent;
-  padding: 9px 12px;
-  border-radius: 12px;
-  cursor:pointer;
-  font-weight: 850;
-  color: var(--muted);
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-.segBtn:hover{ background: #F2F6FF; color: var(--text); }
-.segActive{
-  background: var(--brandSoft);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--brandLine);
-}
-
-.rightControls{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex: 1;
-  justify-content:flex-end;
-  min-width: 260px;
-}
-
-.toggle{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  color: var(--muted);
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
   font-size: 13px;
-  user-select:none;
+  color: #64748B;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.tab:hover{ color: #334155; }
+.tabActive{
+  background: #fff;
+  color: #0F172A;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* ========== RIGHT CONTROLS ========== */
+.rightControls{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 200px;
+}
+
+/* ========== TOGGLE ========== */
+.toggle{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle input{ position: absolute; opacity: 0; width: 0; height: 0; }
+.toggleTrack{
+  width: 36px; height: 20px;
+  background: #CBD5E1;
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+.toggle input:checked + .toggleTrack{ background: #3B82F6; }
+.toggleThumb{
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.toggle input:checked + .toggleTrack .toggleThumb{ transform: translateX(16px); }
+.toggleLabel{
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748B;
   white-space: nowrap;
 }
-.toggle input{ transform: translateY(1px); }
 
+/* ========== SEARCH (desktop) ========== */
 .searchWrap{
-  position:relative;
+  position: relative;
   flex: 1;
-  min-width: 220px;
-  max-width: 460px;
+  min-width: 180px;
+  max-width: 320px;
+}
+.searchIcon{
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+  pointer-events: none;
 }
 .search{
-  width:100%;
-  padding: 10px 42px 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
+  width: 100%;
+  padding: 8px 36px 8px 34px;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
   background: #fff;
-  color: var(--text);
+  color: #0F172A;
+  font-size: 13px;
   outline: none;
+  transition: all 0.15s ease;
 }
 .search:focus{
-  box-shadow: 0 0 0 4px rgba(30,99,255,0.14);
-  border-color: rgba(30,99,255,0.35);
+  border-color: #93C5FD;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
 }
-.search::placeholder{ color: rgba(90,107,133,0.75); }
-
-.clear{
-  position:absolute;
-  right:10px;
-  top:50%;
+.search::placeholder{ color: #94A3B8; }
+.clearBtn{
+  position: absolute;
+  right: 6px;
+  top: 50%;
   transform: translateY(-50%);
-  width:28px;height:28px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: #fff;
-  cursor:pointer;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: #F1F5F9;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #64748B;
+  transition: all 0.15s ease;
+  padding: 0;
 }
+.clearBtn:hover{ background: #E2E8F0; color: #334155; }
 
+/* ========== CONTENT ========== */
 .content{
-  max-width: 1180px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 20px;
 }
 
 .metaRow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin: 4px 0 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-.muted{
-  color: var(--muted);
+.metaCount{
+  font-size: 24px;
+  font-weight: 700;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.metaLabel{
   font-size: 14px;
-  font-weight: 800;
+  color: #94A3B8;
+  font-weight: 500;
 }
 
+/* ========== LIST ========== */
 .list{
-  display:grid;
-  gap: 10px;
+  display: grid;
+  gap: 8px;
 }
 
+/* ========== CARD ========== */
 .card{
-  border: 1px solid var(--line);
-  background: var(--card);
-  border-radius: 16px;
-  box-shadow: var(--shadow);
-  overflow:hidden;
+  border: 1px solid #E2E8F0;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.card:hover{ border-color: #CBD5E1; }
+.card[open]{ box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
 
 .cardEditing{
-  outline: 3px solid rgba(124,58,237,0.16);
+  border-color: #A78BFA;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.1);
 }
 
 .cardSum{
   list-style: none;
   cursor: pointer;
-  padding: 12px 12px;
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: background 0.1s ease;
 }
+.cardSum:hover{ background: #FAFBFC; }
 .cardSum::-webkit-details-marker{ display:none; }
 
-.left{ min-width:0; flex: 1; }
-.titleRow{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:10px;
+/* ========== CARD LEFT ========== */
+.cardLeft{ min-width: 0; flex: 1; }
+.cardHeader{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.name{
-  font-weight: 950;
-  font-size: 15px;
-  line-height: 1.2;
-  overflow:hidden;
+.cardName{
+  font-weight: 650;
+  font-size: 14px;
+  color: #0F172A;
+  white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 680px;
 }
-.badges{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.badgeGroup{ display: flex; gap: 4px; flex-wrap: wrap; }
 
-.subRow{
-  margin-top: 6px;
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
+.cardMeta{
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-.mutedText{ color: var(--muted); }
-.dot{ opacity: 0.5; }
-.strong{ color: var(--text); font-weight: 900; }
-.mono{ font-variant-numeric: tabular-nums; }
+.metaDevice, .metaColor, .metaIssue, .metaTime{
+  font-size: 12px;
+  color: #94A3B8;
+  white-space: nowrap;
+}
+.metaDevice{ font-weight: 600; color: #64748B; }
+.metaColor::before, .metaIssue::before, .metaTime::before{
+  content: '·';
+  margin-right: 6px;
+  color: #CBD5E1;
+}
 
-.right{
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
+/* ========== CARD RIGHT ========== */
+.cardRight{
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 .actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  align-items:center;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 .chev{
-  color: var(--muted);
-  font-size: 16px;
-  transform: translateY(2px);
+  color: #CBD5E1;
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
 }
-details[open] .chev{ transform: rotate(180deg) translateY(-2px); }
+details[open] .chev{ transform: rotate(180deg); }
 
-.cardBody{
-  border-top: 1px solid var(--line);
-  padding: 12px;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.field{
-  border: 1px solid var(--line);
-  background: #FBFCFF;
-  border-radius: 14px;
-  padding: 10px;
-  min-width: 0;
-}
-.field.full{ grid-column: 1 / -1; }
-
-.label{
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 900;
-  margin-bottom: 6px;
-}
-.value{
-  font-size: 14px;
-  color: var(--text);
-  word-break: break-word;
-  font-weight: 900;
-}
-.pre{ white-space: pre-wrap; }
-
-.input, .textarea{
-  width:100%;
-  border:1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font: inherit;
-  font-weight: 850;
-  color: var(--text);
-  background:#fff;
-  outline:none;
-}
-.textarea{ min-height: 90px; resize: vertical; }
-.input:focus, .textarea:focus{
-  box-shadow: 0 0 0 4px rgba(30,99,255,0.14);
-  border-color: rgba(30,99,255,0.35);
-}
-
+/* ========== BADGES ========== */
 .badge{
-  display:inline-flex;
-  align-items:center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 950;
-  border: 1px solid var(--line);
-  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
-.badgeOk{ border-color: rgba(22,163,74,0.25); background: var(--okSoft); color: #0B5A23; }
-.badgeWarn{ border-color: rgba(245,158,11,0.25); background: var(--warnSoft); color: #7A4A00; }
-.badgeBad{ border-color: rgba(220,38,38,0.25); background: var(--badSoft); color: #7F1D1D; }
-.badgeNew{ border-color: rgba(37,99,235,0.25); background: var(--newSoft); color: #0B2E9E; }
-.badgeUsed{ border-color: rgba(14,165,233,0.25); background: var(--usedSoft); color: #045B7C; }
-.badgeEdit{ border-color: rgba(124,58,237,0.25); background: var(--editSoft); color: #3A1A8A; }
+.badgeOk{ background: #F0FDF4; color: #166534; }
+.badgeWarn{ background: #FFFBEB; color: #92400E; }
+.badgeBad{ background: #FEF2F2; color: #991B1B; }
+.badgeNew{ background: #EFF6FF; color: #1E40AF; }
+.badgeUsed{ background: #F0F9FF; color: #0C4A6E; }
+.badgeEdit{ background: #F5F3FF; color: #5B21B6; }
 
-.chip{
-  display:inline-flex;
-  align-items:center;
-  padding: 8px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: #fff;
+/* ========== CHIPS ========== */
+.chipDone{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
   font-size: 12px;
-  font-weight: 850;
-  color: var(--muted);
+  font-weight: 600;
+  background: #F0FDF4;
+  color: #166534;
 }
-.chipOk{ background: var(--okSoft); border-color: rgba(22,163,74,0.25); color: #0B5A23; }
-.chipBad{ background: var(--badSoft); border-color: rgba(220,38,38,0.25); color: #7F1D1D; }
-.chipSoft{ background: #fff; }
+.chipRejected{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #FEF2F2;
+  color: #991B1B;
+}
 
+/* ========== BUTTONS ========== */
 .btn{
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.btn:disabled{ opacity: 0.5; cursor: not-allowed; }
+.btn:active{ transform: scale(0.97); }
+
+.btnGhost{
+  background: transparent;
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}
+.btnGhost:hover{ background: #F8FAFC; color: #334155; border-color: #CBD5E1; }
+
+.btnPrimary{ background: #3B82F6; color: #fff; }
+.btnPrimary:hover{ background: #2563EB; }
+
+.btnDanger{ background: #FEF2F2; color: #DC2626; }
+.btnDanger:hover{ background: #FEE2E2; color: #B91C1C; }
+
+/* ========== CARD BODY ========== */
+.cardBody{
+  border-top: 1px solid #F1F5F9;
+  padding: 16px;
+  background: #FAFBFC;
+}
+.detailGrid{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.detailItem{
   background: #fff;
-  color: var(--text);
-  padding: 9px 12px;
-  border-radius: 14px;
-  cursor:pointer;
-  font-weight: 950;
+  border: 1px solid #F1F5F9;
+  border-radius: 10px;
+  padding: 10px 12px;
 }
-.btn:disabled{ opacity:0.55; cursor:not-allowed; }
-
-.btnSoft:hover{ background: #F3F6FB; }
-.btnPrimary{
-  border: 0;
-  background: linear-gradient(135deg, var(--brand), #52D0FF);
-  color: #fff;
-  box-shadow: 0 12px 22px rgba(30,99,255,0.20);
+.detailFull{ grid-column: 1 / -1; }
+.detailLabel{
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
 }
-.btnPrimary:hover{ filter: brightness(1.03); }
-
-.btnBad{
-  border: 0;
-  background: linear-gradient(135deg, #DC2626, #FB7185);
-  color:#fff;
-  box-shadow: 0 12px 22px rgba(220,38,38,0.18);
+.detailValue{
+  font-size: 13px;
+  color: #334155;
+  font-weight: 500;
+  word-break: break-word;
 }
-.btnBad:hover{ filter: brightness(1.03); }
+.mono{ font-variant-numeric: tabular-nums; }
+.pre{ white-space: pre-wrap; }
 
+/* ========== INPUTS ========== */
+.input, .textarea{
+  width: 100%;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0F172A;
+  background: #fff;
+  outline: none;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.textarea{ min-height: 80px; resize: vertical; }
+.input:focus, .textarea:focus{
+  border-color: #93C5FD;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+
+/* ========== EMPTY STATE ========== */
 .emptyCard{
-  border: 1px dashed var(--line);
-  background: #fff;
-  border-radius: 16px;
-  padding: 14px;
-  color: var(--muted);
-  text-align:center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 24px;
+  border: 1px dashed #E2E8F0;
+  border-radius: 12px;
+  color: #94A3B8;
+  font-size: 15px;
+  font-weight: 500;
 }
 
-/* ✅ Responsive: eerder naar 1 kolom + knoppen stacken */
+/* ========== BOTTOM NAV ========== */
+.bottomNav{
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  padding: 6px 8px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  justify-content: space-around;
+  align-items: center;
+}
+.bnItem{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #94A3B8;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 64px;
+}
+.bnItem:active{ transform: scale(0.92); }
+.bnActive{
+  color: #3B82F6;
+}
+.bnLabel{
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ========== RESPONSIVE: tablet ========== */
 @media (max-width: 980px){
-  .grid{ grid-template-columns: 1fr; }
-  .name{ max-width: 100%; }
+  .detailGrid{ grid-template-columns: 1fr; }
 }
 
+/* ========== RESPONSIVE: mobile ========== */
 @media (max-width: 720px){
-  .topbarInner{
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-  .topRight{
-    justify-content: space-between;
-    width: 100%;
-  }
-  .controls{
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .rightControls{
-    width:100%;
-    justify-content:space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .searchWrap{ max-width: none; min-width: 0; }
+  /* Show mobile header, hide desktop topbar */
+  .mobileHeader{ display: flex; }
+  .mobileSearchBar{ display: block; }
+  .topbar{ display: none; }
+  .bottomNav{ display: flex; }
 
+  /* Content padding for bottom nav */
+  .content{
+    padding: 12px 16px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Mobile search bar sticky position */
+  .mobileSearchBar{
+    top: calc(52px + env(safe-area-inset-top, 0px));
+  }
+
+  /* Smaller meta */
+  .metaCount{ font-size: 20px; }
+
+  /* Card mobile layout */
+  .card{ border-radius: 14px; }
   .cardSum{
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
   }
-  .right{
+  .cardRight{
     justify-content: space-between;
     align-items: center;
+    width: 100%;
   }
   .actions{
     width: 100%;
-    justify-content: flex-start;
+    flex-wrap: wrap;
   }
-  .actions .btn, .actions .chip{
-    width: 100%;
+  .actions .btn, .actions .chipDone, .actions .chipRejected{
+    flex: 1;
     text-align: center;
     justify-content: center;
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+  .cardBody{ padding: 12px 14px; }
+
+  /* Mobile-friendly inputs */
+  .input, .textarea{
+    font-size: 16px;
+    padding: 10px 12px;
+    border-radius: 10px;
   }
 }
 `;
