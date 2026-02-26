@@ -310,6 +310,7 @@ export default function AdminPage() {
             <span className="statusDot" />
             {rows.length}
           </span>
+          <a href="/catalogus" className="mhBtn" aria-label="Catalogus" style={{ textDecoration: "none", fontSize: "18px" }}>📋</a>
           <button className="mhBtn" onClick={() => setMobileSearch(!mobileSearch)} aria-label="Zoeken">
             <IconSearch />
           </button>
@@ -372,6 +373,9 @@ export default function AdminPage() {
               <span className="statusDot" />
               {status}
             </span>
+            <a href="/catalogus" className="btn btnCatalog" title="Reparatie catalogus">
+              📋 Catalogus
+            </a>
             <button className="btn btnIcon" onClick={() => load(false)} title="Vernieuwen">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -846,6 +850,14 @@ body{
   color: #0F172A;
   border-color: #CBD5E1;
 }
+.btnCatalog{
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid #E2E8F0; border-radius: 10px;
+  background: #fff; cursor: pointer; color: #0F172A;
+  transition: all 0.15s ease; padding: 0 12px; height: 36px;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.btnCatalog:hover{ background: #F8FAFC; border-color: #CBD5E1; }
 
 /* ========== CONTROLS ========== */
 .controls{
