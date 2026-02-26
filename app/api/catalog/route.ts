@@ -15,6 +15,12 @@ function safe(v: any) {
   return String(v ?? "").trim().replace(/[<>]/g, "");
 }
 
+// Capitalize first letter, leave rest as-is (Apple, iPhone, Samsung)
+function cap(v: any) {
+  const s = safe(v);
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
 // GET /api/catalog?brand=Apple&model=iPhone+14
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -51,10 +57,10 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const row = {
-      brand: safe(body.brand),
-      model: safe(body.model),
-      color: safe(body.color),
-      repair_type: safe(body.repair_type),
+      brand: cap(body.brand),
+      model: cap(body.model),
+      color: cap(body.color),
+      repair_type: cap(body.repair_type),
       quality: safe(body.quality) || "Standaard",
       price: body.price !== "" && body.price !== null && body.price !== undefined
         ? Number(String(body.price).replace(",", ".")) || null
@@ -88,10 +94,10 @@ export async function PATCH(req: Request) {
         : null;
     }
     if (body.quality !== undefined) patch.quality = safe(body.quality) || "Standaard";
-    if (body.repair_type !== undefined) patch.repair_type = safe(body.repair_type);
-    if (body.color !== undefined) patch.color = safe(body.color);
-    if (body.model !== undefined) patch.model = safe(body.model);
-    if (body.brand !== undefined) patch.brand = safe(body.brand);
+    if (body.repair_type !== undefined) patch.repair_type = cap(body.repair_type);
+    if (body.color !== undefined) patch.color = cap(body.color);
+    if (body.model !== undefined) patch.model = cap(body.model);
+    if (body.brand !== undefined) patch.brand = cap(body.brand);
 
     const sb = getAdmin();
     const { error } = await sb.from("repair_catalog").update(patch).eq("id", id);
