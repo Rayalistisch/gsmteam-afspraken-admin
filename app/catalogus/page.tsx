@@ -38,6 +38,14 @@ export default function CatalogusPage() {
   const [addForm, setAddForm] = useState<AddForm>(EMPTY_FORM);
   const [addBusy, setAddBusy] = useState(false);
 
+  // Alle merken eenmalig laden via RPC (geen 500-rij limiet)
+  useEffect(() => {
+    fetch("/api/catalog?brands=1")
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setBrands(data); })
+      .catch(() => {});
+  }, []);
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setStatus("Laden…");
     const params = new URLSearchParams();
@@ -50,10 +58,6 @@ export default function CatalogusPage() {
 
     setRows(data);
     setStatus(`${data.length} reparaties geladen${filterBrand ? ` voor ${filterBrand}` : ""}.`);
-
-    // extract unique brands
-    const allBrands = [...new Set(data.map((r: Row) => r.brand))].sort() as string[];
-    if (!filterBrand) setBrands(allBrands);
   }, [filterBrand, search]);
 
   useEffect(() => { load(); }, [load]);

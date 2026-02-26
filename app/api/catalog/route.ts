@@ -22,14 +22,24 @@ function cap(v: any) {
 }
 
 // GET /api/catalog?brand=Apple&model=iPhone+14
+// GET /api/catalog?brands=1  → geeft alle unieke merken terug
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const brand = searchParams.get("brand") || "";
   const model = searchParams.get("model") || "";
   const search = searchParams.get("q") || "";
+  const brandsOnly = searchParams.get("brands") === "1";
 
   try {
     const sb = getAdmin();
+
+    // Alle unieke merken via RPC (geen limit)
+    if (brandsOnly) {
+      const { data, error } = await sb.rpc("get_brands");
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(data ?? []);
+    }
+
     let q = sb
       .from("repair_catalog")
       .select("id, brand, model, color, repair_type, quality, price")
