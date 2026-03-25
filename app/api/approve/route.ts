@@ -126,6 +126,7 @@ async function buildOfferPdf(input: {
   model?: string;
   color?: string;
   issue?: string;
+  quality?: string;
   price_text?: string;
   preferred_date?: string;
   preferred_time?: string;
@@ -187,6 +188,7 @@ async function buildOfferPdf(input: {
   drawKV("Referentie", input.id);
   drawKV("Toestel", toestel || "-");
   drawKV("Reparatie", input.issue || "-");
+  drawKV("Kwaliteit", input.quality || "-");
   drawKV("Voorkeur", voorkeur || "-");
   y -= 6;
 
@@ -242,7 +244,7 @@ export async function POST(req: Request) {
       .update({ status: "approved" })
       .eq("id", id)
       .select(
-        "id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, price_text, preferred_date, preferred_time"
+        "id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time"
       )
       .single();
 
@@ -278,7 +280,8 @@ export async function POST(req: Request) {
             <h2 style="margin:0 0 10px 0;">Goedgekeurd ✅</h2>
             <p style="margin:0 0 14px 0;color:#444">
               Hallo${customer_name ? " " + safe(customer_name) : ""},<br>
-              Je reparatie-aanvraag is goedgekeurd. In de bijlage vind je de offerte als PDF.
+              Je reparatie-aanvraag is goedgekeurd. In de bijlage vind je de offerte als PDF.<br>
+              ${data.quality ? `<strong>Kwaliteit onderdeel:</strong> ${safe(data.quality)}<br>` : ""}
             </p>
             <p style="margin:0;color:#444">
               Met vriendelijke groet,<br><strong>GSM Team</strong>
@@ -299,6 +302,7 @@ export async function POST(req: Request) {
         model: data.model,
         color: data.color,
         issue: data.issue,
+        quality: data.quality,
         price_text: data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
