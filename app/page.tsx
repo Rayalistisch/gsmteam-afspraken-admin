@@ -47,6 +47,7 @@ type Draft = {
   preferred_date: string;
   preferred_time: string;
   notes: string;
+  save_to_catalog: boolean;
 };
 
 /* SVG icon components */
@@ -100,6 +101,7 @@ export default function AdminPage() {
     preferred_date: "",
     preferred_time: "",
     notes: "",
+    save_to_catalog: false,
   });
 
   const supabase = useMemo(() => buildSupabaseClient(), []);
@@ -238,13 +240,14 @@ export default function AdminPage() {
       preferred_date: r.preferred_date || "",
       preferred_time: r.preferred_time || "",
       notes: r.notes || "",
+      save_to_catalog: false,
     });
     setStatus("Bewerken… (pas prijs/datum/tijd/notitie aan en klik Opslaan)");
   }
 
   function cancelEdit() {
     setEditId(null);
-    setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "" });
+    setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "", save_to_catalog: false });
     setStatus("Bewerken geannuleerd.");
   }
 
@@ -267,10 +270,52 @@ export default function AdminPage() {
         return;
       }
 
-      setStatus("Opgeslagen.");
+      // Prijs ook in catalogus opslaan indien aangevinkt
+      if (draft.save_to_catalog && draft.price_text) {
+        const row = rows.find((r: any) => r.id === id);
+        if (row) {
+          const priceNum = parseFloat(
+            draft.price_text.replace(/[€\s]/g, "").replace(",", ".")
+          );
+          if (!isNaN(priceNum) && row.brand && row.model) {
+            try {
+              const catRes = await fetch(
+                `/api/catalog?brand=${encodeURIComponent(row.brand)}&model=${encodeURIComponent(row.model)}`
+              );
+              if (catRes.ok) {
+                const catalog: any[] = await catRes.json();
+                const match = catalog.find(
+                  (c) =>
+                    c.color?.toLowerCase() === (row.color || "").toLowerCase() &&
+                    c.repair_type?.toLowerCase() === (row.issue || "").toLowerCase()
+                );
+                if (match) {
+                  await fetch("/api/catalog", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: match.id, price: priceNum }),
+                  });
+                  setStatus("Opgeslagen + prijs bijgewerkt in catalogus.");
+                } else {
+                  setStatus("Opgeslagen. (Geen matching catalogusitem gevonden om prijs bij te werken.)");
+                }
+              }
+            } catch {
+              setStatus("Opgeslagen, maar fout bij bijwerken catalogus.");
+            }
+          } else {
+            setStatus("Opgeslagen. (Prijs is geen geldig getal, niet opgeslagen in catalogus.)");
+          }
+        } else {
+          setStatus("Opgeslagen.");
+        }
+      } else {
+        setStatus("Opgeslagen.");
+      }
+
       setBusyId(null);
       setEditId(null);
-      setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "" });
+      setDraft({ price_text: "", preferred_date: "", preferred_time: "", notes: "", save_to_catalog: false });
       load(true);
     } catch (e) {
       console.error(e);
@@ -616,12 +661,22 @@ export default function AdminPage() {
                       <div className="detailItem">
                         <div className="detailLabel">Richtprijs</div>
                         {isEditing ? (
-                          <input
-                            className="input"
-                            value={draft.price_text}
-                            onChange={(e) => setDraft((d) => ({ ...d, price_text: e.target.value }))}
-                            placeholder="Bijv. €79 of Op aanvraag"
-                          />
+                          <>
+                            <input
+                              className="input"
+                              value={draft.price_text}
+                              onChange={(e) => setDraft((d) => ({ ...d, price_text: e.target.value }))}
+                              placeholder="Bijv. €79 of Op aanvraag"
+                            />
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 13, color: "#64748B", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                checked={draft.save_to_catalog}
+                                onChange={(e) => setDraft((d) => ({ ...d, save_to_catalog: e.target.checked }))}
+                              />
+                              Ook opslaan in catalogus (zichtbaar op de site)
+                            </label>
+                          </>
                         ) : (
                           <div className="detailValue mono">{r.price_text || "-"}</div>
                         )}
