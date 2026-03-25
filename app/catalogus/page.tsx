@@ -184,6 +184,7 @@ export default function CatalogusPage() {
                       <select value={addForm.quality} onChange={e => setAddForm(f => ({ ...f, quality: e.target.value }))}>
                         <option value="Officieel">Officieel</option>
                         <option value="Pulled">Pulled</option>
+                        <option value="Compatible">Compatible</option>
                       </select>
                     </label>
                   );
