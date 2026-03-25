@@ -71,7 +71,7 @@ export async function POST(req: Request) {
       model: cap(body.model),
       color: cap(body.color),
       repair_type: cap(body.repair_type),
-      quality: safe(body.quality) || "Standaard",
+      quality: safe(body.quality) || "Officieel",
       price: body.price !== "" && body.price !== null && body.price !== undefined
         ? Number(String(body.price).replace(",", ".")) || null
         : null,
@@ -103,7 +103,7 @@ export async function PATCH(req: Request) {
         ? Number(String(body.price).replace(",", ".")) || null
         : null;
     }
-    if (body.quality !== undefined) patch.quality = safe(body.quality) || "Standaard";
+    if (body.quality !== undefined) patch.quality = safe(body.quality) || "Officieel";
     if (body.repair_type !== undefined) patch.repair_type = cap(body.repair_type);
     if (body.color !== undefined) patch.color = cap(body.color);
     if (body.model !== undefined) patch.model = cap(body.model);

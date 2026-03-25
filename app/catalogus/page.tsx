@@ -21,8 +21,13 @@ type AddForm = {
   price: string;
 };
 
+const SERVICE_TYPES = ["onderzoeken", "reinigen", "softwarereset", "overige"];
+function isService(type: string) {
+  return SERVICE_TYPES.includes(type.toLowerCase().trim());
+}
+
 const EMPTY_FORM: AddForm = {
-  brand: "", model: "", color: "", repair_type: "", quality: "Standaard", price: "",
+  brand: "", model: "", color: "", repair_type: "", quality: "Officieel", price: "",
 };
 
 export default function CatalogusPage() {
@@ -140,8 +145,8 @@ export default function CatalogusPage() {
     .add-form h3 { margin: 0 0 14px; font-size: 15px; font-weight: 700; }
     .add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
     .add-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #475569; }
-    .add-grid input { padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 7px; font-size: 13px; }
-    .add-grid input:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .add-grid input, .add-grid select { padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 7px; font-size: 13px; background: #fff; color: #0f172a; }
+    .add-grid input:focus, .add-grid select:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
     .add-actions { margin-top: 14px; display: flex; gap: 8px; }
     .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #3b82f6; text-decoration: none; margin-bottom: 16px; font-weight: 600; }
     .back-link:hover { text-decoration: underline; }
@@ -167,17 +172,46 @@ export default function CatalogusPage() {
           <div className="add-form">
             <h3>Nieuwe reparatie toevoegen</h3>
             <div className="add-grid">
-              {(["brand","model","color","repair_type","quality","price"] as (keyof AddForm)[]).map(field => (
-                <label key={field}>
-                  {field === "brand" ? "Merk *" : field === "model" ? "Model *" : field === "color" ? "Kleur *" : field === "repair_type" ? "Reparatietype *" : field === "quality" ? "Kwaliteit" : "Prijs (€)"}
-                  <input
-                    type={field === "price" ? "number" : "text"}
-                    value={addForm[field]}
-                    placeholder={field === "price" ? "bijv. 79.95" : ""}
-                    onChange={e => setAddForm(f => ({ ...f, [field]: e.target.value }))}
-                  />
-                </label>
-              ))}
+              {(["brand","model","color","repair_type","quality","price"] as (keyof AddForm)[]).map(field => {
+                if (field === "quality" && isService(addForm.repair_type)) return null;
+
+                const label = field === "brand" ? "Merk *" : field === "model" ? "Model *" : field === "color" ? "Kleur *" : field === "repair_type" ? "Reparatietype *" : field === "quality" ? "Kwaliteit" : "Prijs (€)";
+
+                if (field === "quality") {
+                  return (
+                    <label key={field}>
+                      {label}
+                      <select value={addForm.quality} onChange={e => setAddForm(f => ({ ...f, quality: e.target.value }))}>
+                        <option value="Officieel">Officieel</option>
+                        <option value="Pulled">Pulled</option>
+                      </select>
+                    </label>
+                  );
+                }
+
+                return (
+                  <label key={field}>
+                    {label}
+                    <input
+                      type={field === "price" ? "number" : "text"}
+                      value={addForm[field]}
+                      placeholder={field === "price" ? "bijv. 79.95" : ""}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (field === "repair_type") {
+                          setAddForm(f => ({
+                            ...f,
+                            repair_type: val,
+                            quality: isService(val) ? "Standaard" : (isService(f.repair_type) ? "Officieel" : f.quality),
+                          }));
+                        } else {
+                          setAddForm(f => ({ ...f, [field]: val }));
+                        }
+                      }}
+                    />
+                  </label>
+                );
+              })}
             </div>
             <div className="add-actions">
               <button className="btn btn-primary" disabled={addBusy} onClick={addRepair}>
