@@ -504,6 +504,14 @@ export default function AdminPage() {
                   ? { cls: "badge badgeBad", label: "Afgewezen" }
                   : { cls: "badge badgeWarn", label: "Openstaand" };
 
+              const qualityBadge = r.quality === "Officieel"
+                ? { cls: "badge badgeQualOfficieel", label: "Officieel" }
+                : r.quality === "Pulled"
+                ? { cls: "badge badgeQualPulled", label: "Pulled" }
+                : r.quality === "Compatible"
+                ? { cls: "badge badgeQualCompatible", label: "Compatible" }
+                : null;
+
               const isEditing = editId === r.id;
 
               return (
@@ -514,6 +522,7 @@ export default function AdminPage() {
                         <span className="cardName">{r.customer_name || "Aanvraag"}</span>
                         <div className="badgeGroup">
                           <span className={statusBadge.cls}>{statusBadge.label}</span>
+                          {qualityBadge ? <span className={qualityBadge.cls}>{qualityBadge.label}</span> : null}
                           {newness === "new" ? <span className="badge badgeNew">Nieuw</span> : null}
                           {newness === "used" ? <span className="badge badgeUsed">Gebruikt</span> : null}
                           {isEditing ? <span className="badge badgeEdit">Bewerken</span> : null}
@@ -524,11 +533,11 @@ export default function AdminPage() {
                         {toestel ? <span className="metaDevice">{toestel}</span> : null}
                         {r.color ? <span className="metaColor">{r.color}</span> : null}
                         {r.issue ? <span className="metaIssue">{r.issue}</span> : null}
-                        <span className="metaTime">{fmtNL(r.created_at)}</span>
                       </div>
                     </div>
 
                     <div className="cardRight">
+                      <span className="metaTimeRight">{fmtNL(r.created_at)}</span>
                       {isEditing ? (
                         <div className="actions">
                           <button
@@ -1181,6 +1190,10 @@ details[open] .chev{ transform: rotate(180deg); }
 .badgeNew{ background: #EFF6FF; color: #1E40AF; }
 .badgeUsed{ background: #F0F9FF; color: #0C4A6E; }
 .badgeEdit{ background: #F5F3FF; color: #5B21B6; }
+.badgeQualOfficieel{ background: #EFF6FF; color: #1D4ED8; }
+.badgeQualPulled{ background: #F5F3FF; color: #6D28D9; }
+.badgeQualCompatible{ background: #F0FDF4; color: #166534; }
+.metaTimeRight{ font-size: 12px; color: #94A3B8; white-space: nowrap; text-align: right; }
 
 /* ========== CHIPS ========== */
 .chipDone{
