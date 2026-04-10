@@ -270,7 +270,6 @@ export default function AdminPage() {
         return;
       }
 
-      // Prijs ook in catalogus opslaan indien aangevinkt
       if (draft.save_to_catalog && draft.price_text) {
         const row = rows.find((r: any) => r.id === id);
         if (row) {
@@ -506,8 +505,6 @@ export default function AdminPage() {
 
               const qualityBadge = r.quality === "Officieel"
                 ? { cls: "badge badgeQualOfficieel", label: "Officieel" }
-                : r.quality === "Pulled"
-                ? { cls: "badge badgeQualPulled", label: "Pulled" }
                 : r.quality === "Compatible"
                 ? { cls: "badge badgeQualCompatible", label: "Compatible" }
                 : null;
@@ -1191,7 +1188,6 @@ details[open] .chev{ transform: rotate(180deg); }
 .badgeUsed{ background: #F0F9FF; color: #0C4A6E; }
 .badgeEdit{ background: #F5F3FF; color: #5B21B6; }
 .badgeQualOfficieel{ background: #EFF6FF; color: #1D4ED8; }
-.badgeQualPulled{ background: #F5F3FF; color: #6D28D9; }
 .badgeQualCompatible{ background: #F0FDF4; color: #166534; }
 .metaTimeRight{ font-size: 12px; color: #94A3B8; white-space: nowrap; text-align: right; }
 
