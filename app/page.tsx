@@ -343,9 +343,7 @@ export default function AdminPage() {
       <header className="mobileHeader">
         <div className="mhLeft">
           <div className="mhLogo" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/>
-            </svg>
+            <img src="/favicon.ico" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "8px" }} />
           </div>
           <span className="mhTitle">GSM Team</span>
         </div>
@@ -402,9 +400,7 @@ export default function AdminPage() {
         <div className="topbarInner">
           <div className="brand">
             <div className="logo" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18"/>
-              </svg>
+              <img src="/favicon.ico" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "10px" }} />
             </div>
             <div className="brandText">
               <div className="brandTitle">GSM Team</div>
@@ -771,8 +767,8 @@ body{
 .mhLogo{
   width: 32px; height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #3B82F6, #06B6D4);
-  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 .mhTitle{ font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
 .mhRight{ display: flex; align-items: center; gap: 4px; }
@@ -852,8 +848,7 @@ body{
 .logo{
   width: 38px; height: 38px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #3B82F6, #06B6D4);
-  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
   flex-shrink: 0;
 }
 .brandText{}
