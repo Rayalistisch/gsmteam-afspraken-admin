@@ -40,6 +40,27 @@ export async function GET(req: Request) {
       return NextResponse.json(data ?? []);
     }
 
+    // Unieke modellen voor een merk — pagineer zodat we ALLE rijen krijgen
+    const modelsOnly = searchParams.get("models") === "1";
+    if (modelsOnly && brand) {
+      const PAGE = 1000;
+      let offset = 0;
+      const modelSet = new Set<string>();
+      while (true) {
+        const { data, error } = await sb
+          .from("repair_catalog")
+          .select("model")
+          .eq("brand", brand)
+          .range(offset, offset + PAGE - 1);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        if (!data || data.length === 0) break;
+        data.forEach((r: { model: string }) => modelSet.add(r.model));
+        if (data.length < PAGE) break;
+        offset += PAGE;
+      }
+      return NextResponse.json([...modelSet].sort());
+    }
+
     let q = sb
       .from("repair_catalog")
       .select("id, brand, model, color, repair_type, quality, price")
@@ -62,10 +83,47 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/catalog — nieuwe reparatie toevoegen
+// POST /api/catalog — nieuwe reparatie toevoegen (enkelvoudig of bulk)
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
+
+    // BULK MODE: body is een array van rijen
+    if (Array.isArray(body)) {
+      if (body.length === 0) {
+        return NextResponse.json({ error: "Lege array meegegeven" }, { status: 400 });
+      }
+      if (body.length > 500) {
+        return NextResponse.json({ error: "Maximaal 500 rijen per bulk-insert" }, { status: 400 });
+      }
+
+      const rows = body.map((item: any) => ({
+        brand: cap(item.brand),
+        model: cap(item.model),
+        color: cap(item.color),
+        repair_type: cap(item.repair_type),
+        quality: safe(item.quality) || "Officieel",
+        price: item.price !== undefined && item.price !== null && item.price !== ""
+          ? Number(String(item.price).replace(",", ".")) || null
+          : null,
+      }));
+
+      for (const row of rows) {
+        if (!row.brand || !row.model || !row.color || !row.repair_type) {
+          return NextResponse.json(
+            { error: "Elk item vereist brand, model, color en repair_type" },
+            { status: 400 }
+          );
+        }
+      }
+
+      const sb = getAdmin();
+      const { error } = await sb.from("repair_catalog").insert(rows);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, count: rows.length });
+    }
+
+    // SINGLE MODE: bestaande logica
     const row = {
       brand: cap(body.brand),
       model: cap(body.model),
@@ -118,10 +176,19 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE /api/catalog — reparatie verwijderen
+// DELETE /api/catalog — reparatie verwijderen (enkelvoudig of bulk op quality)
 export async function DELETE(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
+
+    // Bulk-delete op quality (alleen "Pulled" toegestaan als veiligheidsmaatregel)
+    if (!body.id && body.quality === "Pulled") {
+      const sb = getAdmin();
+      const { error } = await sb.from("repair_catalog").delete().eq("quality", "Pulled");
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, deleted: "Pulled" });
+    }
+
     const id = safe(body.id);
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
