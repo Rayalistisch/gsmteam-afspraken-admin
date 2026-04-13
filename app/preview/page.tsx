@@ -56,24 +56,79 @@ export default function PreviewPage() {
   }, [data]);
 
   const emailHtml = useMemo(() => {
-    const name = data.name ? ` ${data.name}` : "";
+    const name = data.name || "klant";
+
+    function detailRow(label: string, value?: string) {
+      if (!value) return "";
+      return `<tr>
+        <td style="padding:10px 12px 10px 0;border-bottom:1px solid #f1f5f9;width:130px;vertical-align:top">
+          <span style="font-family:Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">${label}</span>
+        </td>
+        <td style="padding:10px 0 10px 0;border-bottom:1px solid #f1f5f9;vertical-align:top">
+          <span style="font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:500;color:#0f172a">${value}</span>
+        </td>
+      </tr>`;
+    }
+
+    // Format date
+    let voorkeur = "";
+    if (data.date) {
+      try {
+        const d = new Date(data.date + "T00:00:00");
+        voorkeur = d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+      } catch { voorkeur = data.date; }
+    }
+    if (data.time) voorkeur += (voorkeur ? " om " : "") + data.time;
+
+    const detailRows = [
+      detailRow("Merk",      data.brand),
+      detailRow("Model",     data.model),
+      detailRow("Kleur",     data.color),
+      detailRow("Reparatie", data.issue),
+      detailRow("Kwaliteit", data.quality),
+      detailRow("Prijs",     data.price),
+      detailRow("Voorkeur",  voorkeur),
+    ].join("");
+
     return `
-      <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;line-height:1.5;color:#111">
-        <div style="padding:18px;border:1px solid #e6ecf5;border-radius:14px;background:#fff">
-          <h2 style="margin:0 0 10px 0;">Goedgekeurd ✅</h2>
-          <p style="margin:0 0 14px 0;color:#444">
-            Hallo${name},<br>
-            Je reparatie-aanvraag is goedgekeurd. In de bijlage vind je de offerte als PDF.<br>
-            ${data.quality ? `<strong>Kwaliteit onderdeel:</strong> ${data.quality}<br>` : ""}
-          </p>
-          <p style="margin:0;color:#444">
-            Met vriendelijke groet,<br><strong>GSM Team</strong>
-          </p>
-        </div>
-        <p style="font-size:12px;color:#6b7280;margin:10px 0 0 0;">
-          Referentie: ${data.id}
-        </p>
-      </div>
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed;background-color:#f9f9f9">
+  <tbody><tr><td style="padding-right:10px;padding-left:10px" align="center" valign="top">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px"><tbody><tr><td align="center" valign="top">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#fff;border-color:#e5e5e5;border-style:solid;border-width:0 1px 1px 1px"><tbody>
+        <tr><td style="background-color:#3b82f6;font-size:1px;line-height:3px" height="3">&nbsp;</td></tr>
+        <tr><td style="padding-top:40px;padding-bottom:16px" align="center" valign="middle">
+          <img src="/favicon.ico" alt="GSM Team" width="48" height="48" border="0" style="display:block;width:48px;height:48px;border-radius:10px;object-fit:cover">
+        </td></tr>
+        <tr><td style="padding-bottom:8px;padding-left:20px;padding-right:20px" align="center" valign="top">
+          <h2 style="color:#0f172a;font-family:Helvetica,Arial,sans-serif;font-size:26px;font-weight:600;line-height:34px;text-align:center;padding:0;margin:0">Reparatie goedgekeurd ✅</h2>
+        </td></tr>
+        <tr><td style="padding-bottom:20px;padding-left:20px;padding-right:20px" align="center" valign="top">
+          <h4 style="color:#64748b;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">Hallo ${name}</h4>
+        </td></tr>
+        <tr><td style="padding-left:40px;padding-right:40px" align="center">
+          <p style="color:#475569;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">Je reparatie-aanvraag is goedgekeurd.<br>In de bijlage vind je de offerte als PDF.</p>
+        </td></tr>
+        <tr><td style="padding:24px 60px 0" align="center" valign="top">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #e2e8f0"><tbody>
+            ${detailRows}
+          </tbody></table>
+        </td></tr>
+        <tr><td style="font-size:1px;line-height:1px" height="28">&nbsp;</td></tr>
+        <tr><td style="padding-bottom:40px;padding-left:60px;padding-right:60px" align="center" valign="middle">
+          <p style="color:#475569;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">Met vriendelijke groet,<br><strong style="color:#0f172a">GSM Team</strong></p>
+        </td></tr>
+      </tbody></table>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td style="font-size:1px;line-height:1px" height="30">&nbsp;</td></tr></tbody></table>
+    </td></tr></tbody></table>
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px"><tbody><tr><td align="center" valign="top">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody>
+        <tr><td style="padding:10px" align="center"><p style="color:#bbb;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:20px;text-align:center;padding:0;margin:0">© GSM Team</p></td></tr>
+        <tr><td style="padding:0 10px 20px" align="center"><p style="color:#bbb;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:20px;text-align:center;padding:0;margin:0">Referentie: ${data.id}</p></td></tr>
+        <tr><td style="font-size:1px;line-height:1px" height="30">&nbsp;</td></tr>
+      </tbody></table>
+    </td></tr></tbody></table>
+  </td></tr></tbody>
+</table>
     `;
   }, [data]);
 
@@ -98,7 +153,7 @@ export default function PreviewPage() {
     .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
     .tab:hover:not(.active) { color: #0f172a; }
     .preview-body { padding: 24px; }
-    .email-frame { width: 100%; border: none; height: 280px; background: #f8fafc; border-radius: 8px; }
+    .email-frame { width: 100%; border: none; height: 520px; background: #f9f9f9; border-radius: 8px; }
     .pdf-frame { width: 100%; border: none; height: 700px; border-radius: 8px; background: #f1f5f9; }
     .open-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 14px; background: #3b82f6; color: #fff; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; }
     .open-btn:hover { background: #2563eb; }

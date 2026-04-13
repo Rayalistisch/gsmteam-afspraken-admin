@@ -135,7 +135,20 @@ export async function POST(req: Request) {
       }
 
       const subject = "Reparatie goedgekeurd + offerte – GSM Team";
-      const html = buildOfferEmail({ customer_name, quality: data.quality, id: data.id });
+      const logoUrl = `${new URL(req.url).origin}/favicon.ico`;
+      const html = buildOfferEmail({
+        customer_name,
+        id:             data.id,
+        logoUrl,
+        brand:          data.brand,
+        model:          data.model,
+        color:          data.color,
+        issue:          data.issue,
+        quality:        data.quality,
+        price_text:     data.price_text,
+        preferred_date: data.preferred_date,
+        preferred_time: data.preferred_time,
+      });
 
       const pdf = await buildOfferPdf({
         id: data.id,
