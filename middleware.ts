@@ -12,5 +12,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|api/auth/pin|_next|favicon.ico).*)"],
+  // api/auth/pin  → PIN-login zelf
+  // api/create-request → Shopify form submit (cross-origin, geen cookie)
+  // api/catalog        → Shopify catalogus ophalen (cross-origin)
+  matcher: ["/((?!login|api/auth/pin|api/create-request|api/catalog|_next|favicon.ico).*)"],
 };
