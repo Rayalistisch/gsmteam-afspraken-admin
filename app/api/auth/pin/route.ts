@@ -15,9 +15,12 @@ export async function POST(req: Request) {
   }
 
   const res = NextResponse.json({ ok: true });
+  // SameSite=None + Secure zodat de cookie ook werkt in de Shopify embedded iframe (cross-site)
+  const isProd = process.env.NODE_ENV === "production";
   res.cookies.set("gsm_pin_auth", process.env.AUTH_SECRET, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 dagen
   });
