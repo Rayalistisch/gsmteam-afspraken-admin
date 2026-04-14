@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import DashboardShell from "../components/DashboardShell";
 
 type Row = {
   id: string;
@@ -357,11 +358,9 @@ export default function CatalogusPage() {
   `;
 
   return (
-    <>
+    <DashboardShell>
       <style>{styles}</style>
       <div className="cat-wrap">
-        <a href="/" className="back-link">← Terug naar aanvragen</a>
-
         <div className="cat-header">
           <div>
             <h1 className="cat-title">Reparatie catalogus</h1>
@@ -740,6 +739,6 @@ export default function CatalogusPage() {
           </table>
         </div>
       </div>
-    </>
+    </DashboardShell>
   );
 }

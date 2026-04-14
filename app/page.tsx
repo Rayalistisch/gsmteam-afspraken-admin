@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import DashboardShell from "./components/DashboardShell";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Row = any;
@@ -84,6 +85,18 @@ const filterConfig = [
   { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afwijs", Icon: IconX },
   { key: "all" as const, label: "Alles", shortLabel: "Alles", Icon: IconList },
 ];
+
+const AVATAR_COLORS = ["#3B82F6","#8B5CF6","#EC4899","#F59E0B","#10B981","#EF4444","#6366F1","#0EA5E9"];
+function getAvatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+function getInitials(name: string) {
+  const p = name.trim().split(/\s+/).filter(Boolean);
+  if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase() || "?";
+}
 
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -336,7 +349,7 @@ export default function AdminPage() {
   }, [filter, autoRefresh]);
 
   return (
-    <div className="wrap">
+    <DashboardShell>
       <style>{styles}</style>
 
       {/* ====== MOBILE HEADER ====== */}
@@ -398,24 +411,13 @@ export default function AdminPage() {
       {/* ====== DESKTOP HEADER ====== */}
       <header className="topbar">
         <div className="topbarInner">
-          <div className="brand">
-            <div className="logo" aria-hidden="true">
-              <img src="/favicon.ico" alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "10px" }} />
-            </div>
-            <div className="brandText">
-              <div className="brandTitle">GSM Team</div>
-              <div className="brandSub">Afspraken beheer</div>
-            </div>
-          </div>
+          <div className="pageTitle">Aanvragen</div>
 
           <div className="topRight">
             <span className="statusChip" title="Status">
               <span className="statusDot" />
               {status}
             </span>
-            <a href="/catalogus" className="btn btnCatalog" title="Reparatie catalogus">
-              📋 Catalogus
-            </a>
             <button className="btn btnIcon" onClick={() => load(false)} title="Vernieuwen">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -475,6 +477,19 @@ export default function AdminPage() {
           <span className="metaLabel">van {rows.length} aanvragen</span>
         </div>
 
+        {/* Table header — desktop only */}
+        {visibleRows.length > 0 && (
+          <div className="tableHead">
+            <div className="thCell thKlant">Klant</div>
+            <div className="thCell thApparaat">Apparaat</div>
+            <div className="thCell thReparatie">Reparatie</div>
+            <div className="thCell thDatum">Datum</div>
+            <div className="thCell thPrijs">Prijs</div>
+            <div className="thCell thStatus">Status</div>
+            <div />
+          </div>
+        )}
+
         <section className="list">
           {visibleRows.length === 0 ? (
             <div className="emptyCard">
@@ -491,7 +506,6 @@ export default function AdminPage() {
               const contact = `${r.customer_email || ""}${r.customer_phone ? ` · ${r.customer_phone}` : ""}`;
               const voorkeur = `${r.preferred_date || ""}${r.preferred_time ? ` om ${r.preferred_time}` : ""}`.trim();
 
-              const newness = getNewness(r);
               const statusBadge =
                 r.status === "approved"
                   ? { cls: "badge badgeOk", label: "Goedgekeurd" }
@@ -506,117 +520,101 @@ export default function AdminPage() {
                 : null;
 
               const isEditing = editId === r.id;
+              const avatarBg = getAvatarColor(r.customer_name || "");
+              const initials = getInitials(r.customer_name || "?");
 
               return (
                 <details key={r.id} className={cx("card", isEditing && "cardEditing")}>
                   <summary className="cardSum">
-                    <div className="cardLeft">
-                      <div className="cardHeader">
-                        <span className="cardName">{r.customer_name || "Aanvraag"}</span>
-                        <div className="badgeGroup">
-                          <span className={statusBadge.cls}>{statusBadge.label}</span>
-                          {qualityBadge ? <span className={qualityBadge.cls}>{qualityBadge.label}</span> : null}
-                          {newness === "new" ? <span className="badge badgeNew">Nieuw</span> : null}
-                          {newness === "used" ? <span className="badge badgeUsed">Gebruikt</span> : null}
-                          {isEditing ? <span className="badge badgeEdit">Bewerken</span> : null}
+
+                    {/* ── Data rij ── */}
+                    <div className="rowData">
+                      <div className="rowKlant">
+                        <div className="rowAvatar" style={{ background: avatarBg }}>{initials}</div>
+                        <div className="rowKlantText">
+                          <div className="rowName">{r.customer_name || "Aanvraag"}</div>
+                          <div className="rowContact">{contact || "–"}</div>
                         </div>
                       </div>
 
-                      <div className="cardMeta">
-                        {toestel ? <span className="metaDevice">{toestel}</span> : null}
-                        {r.color ? <span className="metaColor">{r.color}</span> : null}
-                        {r.issue ? <span className="metaIssue">{r.issue}</span> : null}
+                      <div className="rowCol colApparaat">
+                        {toestel ? <div className="rowMain">{toestel}</div> : <span className="rowEmpty">–</span>}
+                        {r.color ? <div className="rowSub">{r.color}</div> : null}
                       </div>
-                    </div>
 
-                    <div className="cardRight">
-                      <span className="metaTimeRight">{fmtNL(r.created_at)}</span>
-                      {isEditing ? (
-                        <div className="actions">
-                          <button
-                            className="btn btnGhost"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              cancelEdit();
-                            }}
-                            disabled={busyId === r.id}
-                          >
-                            Annuleren
-                          </button>
-                          <button
-                            className="btn btnPrimary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              saveEdit(r.id);
-                            }}
-                            disabled={busyId === r.id}
-                          >
-                            {busyId === r.id ? "Bezig…" : "Opslaan"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="actions">
-                          <button
-                            className="btn btnGhost"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (editId) cancelEdit();
-                              startEdit(r);
-                            }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                            Bewerken
-                          </button>
+                      <div className="rowCol colReparatie">
+                        {r.issue ? <div className="rowMain">{r.issue}</div> : <span className="rowEmpty">–</span>}
+                        {qualityBadge ? <span className={qualityBadge.cls} style={{marginTop:3}}>{qualityBadge.label}</span> : null}
+                      </div>
 
-                          {r.status === "approved" ? (
-                            <span className="chipDone">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12"/>
-                              </svg>
-                              Klaar
-                            </span>
-                          ) : r.status === "rejected" ? (
-                            <span className="chipRejected">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                              </svg>
-                              Afgewezen
-                            </span>
-                          ) : (
-                            <>
-                              <button
-                                className="btn btnDanger"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  reject(r.id);
-                                }}
-                                disabled={busyId === r.id}
-                              >
-                                {busyId === r.id ? "Bezig…" : "Afwijzen"}
-                              </button>
-                              <button
-                                className="btn btnPrimary"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  approve(r.id);
-                                }}
-                                disabled={busyId === r.id}
-                              >
-                                {busyId === r.id ? "Bezig…" : "Goedkeuren"}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
+                      <div className="rowCol colDatum">
+                        {r.preferred_date
+                          ? <><div className="rowMain">{r.preferred_date}</div>{r.preferred_time ? <div className="rowSub">{r.preferred_time}</div> : null}</>
+                          : <span className="rowEmpty">–</span>}
+                      </div>
+
+                      <div className="rowCol colPrijs">
+                        {r.price_text ? <span className="rowPrice">{r.price_text}</span> : <span className="rowEmpty">–</span>}
+                      </div>
+
+                      <div className="rowCol colStatus">
+                        <span className={statusBadge.cls}>{statusBadge.label}</span>
+                        {isEditing ? <span className="badge badgeEdit" style={{marginTop:3}}>Bewerken</span> : null}
+                      </div>
 
                       <span className="chev" aria-hidden="true">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="6 9 12 15 18 9"/>
                         </svg>
                       </span>
+                    </div>
+
+                    {/* ── Mobiele meta (enkel mobiel) ── */}
+                    <div className="mobileMeta">
+                      {[toestel, r.color, r.issue].filter(Boolean).join(" · ")}
+                      {qualityBadge ? <span className={cx(qualityBadge.cls, "mobileQual")}>{qualityBadge.label}</span> : null}
+                      {r.price_text ? <span className="mobilePrijs">{r.price_text}</span> : null}
+                      <span className={cx(statusBadge.cls, "mobileStatus")}>{statusBadge.label}</span>
+                    </div>
+
+                    {/* ── Actie-balk (onder data) ── */}
+                    <div className="rowActBar">
+                      {isEditing ? (
+                        <>
+                          <button className="btn btnGhost btnSm" onClick={(e) => { e.preventDefault(); cancelEdit(); }} disabled={busyId === r.id}>
+                            Annuleren
+                          </button>
+                          <button className="btn btnPrimary btnSm" onClick={(e) => { e.preventDefault(); saveEdit(r.id); }} disabled={busyId === r.id}>
+                            {busyId === r.id ? "Bezig…" : "Opslaan"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="btn btnGhost btnSm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (editId) cancelEdit();
+                              startEdit(r);
+                              const det = (e.currentTarget as HTMLElement).closest("details");
+                              if (det) det.open = true;
+                            }}
+                          >
+                            Bewerken
+                          </button>
+                          {r.status === "pending" && (
+                            <>
+                              <span className="actDivider" />
+                              <button className="btn btnDanger btnSm" onClick={(e) => { e.preventDefault(); reject(r.id); }} disabled={busyId === r.id}>
+                                {busyId === r.id ? "…" : "Afwijzen"}
+                              </button>
+                              <button className="btn btnPrimary btnSm" onClick={(e) => { e.preventDefault(); approve(r.id); }} disabled={busyId === r.id}>
+                                {busyId === r.id ? "…" : "Goedkeuren"}
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
                   </summary>
 
@@ -635,12 +633,7 @@ export default function AdminPage() {
                       <div className="detailItem">
                         <div className="detailLabel">Datum aanpassen</div>
                         {isEditing ? (
-                          <input
-                            className="input"
-                            value={draft.preferred_date}
-                            onChange={(e) => setDraft((d) => ({ ...d, preferred_date: e.target.value }))}
-                            placeholder="YYYY-MM-DD"
-                          />
+                          <input className="input" value={draft.preferred_date} onChange={(e) => setDraft((d) => ({ ...d, preferred_date: e.target.value }))} placeholder="YYYY-MM-DD" />
                         ) : (
                           <div className="detailValue mono">{r.preferred_date || "-"}</div>
                         )}
@@ -649,12 +642,7 @@ export default function AdminPage() {
                       <div className="detailItem">
                         <div className="detailLabel">Tijd aanpassen</div>
                         {isEditing ? (
-                          <input
-                            className="input"
-                            value={draft.preferred_time}
-                            onChange={(e) => setDraft((d) => ({ ...d, preferred_time: e.target.value }))}
-                            placeholder="bijv. 14:30"
-                          />
+                          <input className="input" value={draft.preferred_time} onChange={(e) => setDraft((d) => ({ ...d, preferred_time: e.target.value }))} placeholder="bijv. 14:30" />
                         ) : (
                           <div className="detailValue mono">{r.preferred_time || "-"}</div>
                         )}
@@ -664,18 +652,9 @@ export default function AdminPage() {
                         <div className="detailLabel">Richtprijs</div>
                         {isEditing ? (
                           <>
-                            <input
-                              className="input"
-                              value={draft.price_text}
-                              onChange={(e) => setDraft((d) => ({ ...d, price_text: e.target.value }))}
-                              placeholder="Bijv. €79 of Op aanvraag"
-                            />
+                            <input className="input" value={draft.price_text} onChange={(e) => setDraft((d) => ({ ...d, price_text: e.target.value }))} placeholder="Bijv. €79 of Op aanvraag" />
                             <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 13, color: "#64748B", cursor: "pointer" }}>
-                              <input
-                                type="checkbox"
-                                checked={draft.save_to_catalog}
-                                onChange={(e) => setDraft((d) => ({ ...d, save_to_catalog: e.target.checked }))}
-                              />
+                              <input type="checkbox" checked={draft.save_to_catalog} onChange={(e) => setDraft((d) => ({ ...d, save_to_catalog: e.target.checked }))} />
                               Ook opslaan in catalogus (zichtbaar op de site)
                             </label>
                           </>
@@ -692,12 +671,7 @@ export default function AdminPage() {
                       <div className="detailItem detailFull">
                         <div className="detailLabel">Notities (intern)</div>
                         {isEditing ? (
-                          <textarea
-                            className="textarea"
-                            value={draft.notes}
-                            onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
-                            placeholder="Bijv. alternatief tijdstip: 15:30 / klant gebeld / prijs besproken…"
-                          />
+                          <textarea className="textarea" value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} placeholder="Bijv. alternatief tijdstip: 15:30 / klant gebeld / prijs besproken…" />
                         ) : (
                           <div className="detailValue pre">{r.notes || "-"}</div>
                         )}
@@ -724,7 +698,7 @@ export default function AdminPage() {
           </button>
         ))}
       </nav>
-    </div>
+    </DashboardShell>
   );
 }
 
@@ -740,13 +714,10 @@ body{
   height:100%;
   background: #F8FAFC;
   color: #0F172A;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   overscroll-behavior-y: contain;
 }
-
-.wrap{ min-height:100vh; min-height: 100dvh; }
 
 /* ========== MOBILE HEADER ========== */
 .mobileHeader{
@@ -843,26 +814,12 @@ body{
   gap: 16px;
 }
 
-/* ========== BRAND ========== */
-.brand{ display:flex; align-items:center; gap:12px; }
-.logo{
-  width: 38px; height: 38px;
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.brandText{}
-.brandTitle{
+/* ========== PAGE TITLE ========== */
+.pageTitle{
+  font-size: 17px;
   font-weight: 700;
-  font-size: 15px;
-  letter-spacing: -0.02em;
   color: #0F172A;
-}
-.brandSub{
-  font-size: 12px;
-  color: #94A3B8;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 /* ========== TOP RIGHT ========== */
@@ -906,14 +863,6 @@ body{
   color: #0F172A;
   border-color: #CBD5E1;
 }
-.btnCatalog{
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid #E2E8F0; border-radius: 10px;
-  background: #fff; cursor: pointer; color: #0F172A;
-  transition: all 0.15s ease; padding: 0 12px; height: 36px;
-  font-size: 13px; font-weight: 600; text-decoration: none;
-}
-.btnCatalog:hover{ background: #F8FAFC; border-color: #CBD5E1; }
 
 /* ========== CONTROLS ========== */
 .controls{
@@ -1049,19 +998,19 @@ body{
 
 /* ========== CONTENT ========== */
 .content{
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 24px;
 }
 
 .metaRow{
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .metaCount{
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   color: #0F172A;
   letter-spacing: -0.02em;
@@ -1073,97 +1022,168 @@ body{
   font-weight: 500;
 }
 
+/* ========== SHARED GRID ========== */
+.tableHead,
+.rowData{
+  display: grid;
+  grid-template-columns: 20fr 13fr 13fr 10fr 8fr 14fr 20px;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ========== TABLE HEADER ========== */
+.tableHead{
+  padding: 0 16px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 4px;
+}
+.thCell{
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
 /* ========== LIST ========== */
 .list{
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* ========== CARD ========== */
 .card{
   border: 1px solid #E2E8F0;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.card:hover{ border-color: #CBD5E1; }
-.card[open]{ box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.card:hover{ border-color: #CBD5E1; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+.card[open]{ box-shadow: 0 3px 10px rgba(0,0,0,0.07); border-color: #CBD5E1; }
 
 .cardEditing{
   border-color: #A78BFA;
-  box-shadow: 0 0 0 3px rgba(139,92,246,0.1);
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.08);
 }
 
+/* ========== CARD SUMMARY ========== */
 .cardSum{
   list-style: none;
   cursor: pointer;
-  padding: 14px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   transition: background 0.1s ease;
 }
-.cardSum:hover{ background: #FAFBFC; }
+.cardSum:hover{ background: #FAFCFF; }
 .cardSum::-webkit-details-marker{ display:none; }
 
-/* ========== CARD LEFT ========== */
-.cardLeft{ min-width: 0; flex: 1; }
-.cardHeader{
+.rowData{
+  padding: 12px 16px 6px;
+}
+
+.rowActBar{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 10px 60px;
+  border-top: 1px solid #f8fafc;
+  justify-content: flex-end;
+}
+
+/* ========== ROW CELLS ========== */
+.rowKlant{
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
 }
-.cardName{
-  font-weight: 650;
-  font-size: 14px;
+.rowAvatar{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.rowKlantText{ min-width: 0; }
+.rowName{
+  font-weight: 600;
+  font-size: 13px;
   color: #0F172A;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.badgeGroup{ display: flex; gap: 4px; flex-wrap: wrap; }
-
-.cardMeta{
-  margin-top: 4px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.metaDevice, .metaColor, .metaIssue, .metaTime{
-  font-size: 12px;
+.rowContact{
+  font-size: 11px;
   color: #94A3B8;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
 }
-.metaDevice{ font-weight: 600; color: #64748B; }
-.metaColor::before, .metaIssue::before, .metaTime::before{
-  content: '·';
-  margin-right: 6px;
+
+.rowCol{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.rowMain{
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowSub{
+  font-size: 11px;
+  color: #94A3B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rowPrice{
+  font-size: 13px;
+  font-weight: 700;
+  color: #0F172A;
+}
+.rowEmpty{
+  font-size: 13px;
   color: #CBD5E1;
 }
 
-/* ========== CARD RIGHT ========== */
-.cardRight{
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.btnSm{
+  padding: 5px 12px;
+  font-size: 12px;
+}
+.actDivider{
+  width: 1px;
+  height: 18px;
+  background: #E2E8F0;
   flex-shrink: 0;
 }
-.actions{
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
+
 .chev{
   color: #CBD5E1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   transition: transform 0.2s ease;
 }
 details[open] .chev{ transform: rotate(180deg); }
+
+/* Mobiele meta-rij: verborgen op desktop */
+.mobileMeta{ display: none; }
 
 /* ========== BADGES ========== */
 .badge{
@@ -1352,59 +1372,76 @@ details[open] .chev{ transform: rotate(180deg); }
 }
 
 /* ========== RESPONSIVE: tablet ========== */
-@media (max-width: 980px){
+@media (max-width: 1100px){
   .detailGrid{ grid-template-columns: 1fr; }
+  .tableHead,
+  .rowData{
+    grid-template-columns: 22fr 15fr 15fr 16fr 20px;
+  }
+  .colDatum, .colPrijs, .thDatum, .thPrijs{ display: none; }
 }
 
 /* ========== RESPONSIVE: mobile ========== */
 @media (max-width: 720px){
-  /* Show mobile header, hide desktop topbar */
+  /* Toon mobiele header, verberg desktop topbar */
   .mobileHeader{ display: flex; }
   .mobileSearchBar{ display: block; }
   .topbar{ display: none; }
   .bottomNav{ display: flex; }
 
-  /* Content padding for bottom nav */
   .content{
-    padding: 12px 16px;
+    padding: 12px 12px;
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   }
-
-  /* Mobile search bar sticky position */
   .mobileSearchBar{
     top: calc(52px + env(safe-area-inset-top, 0px));
   }
 
-  /* Smaller meta */
   .metaCount{ font-size: 20px; }
+  .tableHead{ display: none; }
+  .card{ border-radius: 12px; }
 
-  /* Card mobile layout */
-  .card{ border-radius: 14px; }
-  .cardSum{
+  /* Data-rij op mobiel: verticaal */
+  .rowData{
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 14px;
+    padding: 12px 14px 4px;
   }
-  .cardRight{
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
-  .actions{
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  .actions .btn, .actions .chipDone, .actions .chipRejected{
-    flex: 1;
-    text-align: center;
-    justify-content: center;
-    padding: 10px 12px;
-    border-radius: 10px;
-  }
-  .cardBody{ padding: 12px 14px; }
+  .rowKlant{ width: 100%; margin-bottom: 6px; }
+  .rowCol{ display: none; }
+  .chev{ display: none; }
 
-  /* Mobile-friendly inputs */
+  /* Mobiele meta */
+  .mobileMeta{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748B;
+    font-weight: 500;
+    padding-left: 44px;
+    margin-bottom: 6px;
+  }
+  .mobileQual, .mobileStatus{ margin-left: 2px; }
+  .mobilePrijs{ font-weight: 700; color: #0F172A; }
+
+  /* Actie-balk op mobiel */
+  .rowActBar{
+    padding: 8px 14px 12px;
+    flex-wrap: wrap;
+    border-top: 1px solid #f1f5f9;
+  }
+  .actDivider{ display: none; }
+  .rowActBar .btn{
+    flex: 1;
+    justify-content: center;
+    padding: 10px 8px;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+
+  .cardBody{ padding: 12px 14px; }
   .input, .textarea{
     font-size: 16px;
     padding: 10px 12px;
