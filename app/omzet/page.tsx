@@ -55,24 +55,105 @@ function groupByMonth(rows: any[]): GroupRow[] {
     .slice(-12);
 }
 
-function Bars({ data, limit = 8, color = "#3B82F6" }: { data: GroupRow[]; limit?: number; color?: string }) {
+const GRADIENTS = {
+  blue:   "linear-gradient(90deg, #3B82F6 0%, #93C5FD 100%)",
+  purple: "linear-gradient(90deg, #8B5CF6 0%, #C4B5FD 100%)",
+  green:  "linear-gradient(90deg, #10B981 0%, #6EE7B7 100%)",
+};
+
+const SHADOWS = {
+  blue:   "0 2px 8px rgba(59,130,246,0.35)",
+  purple: "0 2px 8px rgba(139,92,246,0.35)",
+  green:  "0 2px 8px rgba(16,185,129,0.35)",
+};
+
+function Bars({
+  data, limit = 8, variant = "blue", grandTotal,
+}: {
+  data: GroupRow[];
+  limit?: number;
+  variant?: keyof typeof GRADIENTS;
+  grandTotal?: number;
+}) {
   const items = data.slice(0, limit);
   const max = items[0]?.total || 1;
+  const total = grandTotal ?? items.reduce((s, i) => s + i.total, 0);
+
   if (items.length === 0) return <div className="oEmpty">Geen data beschikbaar</div>;
+
   return (
     <div className="oBars">
-      {items.map((item) => (
-        <div key={item.label} className="oBarRow">
-          <div className="oBarLabel" title={item.label}>{item.label}</div>
-          <div className="oBarTrack">
-            <div className="oBarFill" style={{ width: `${(item.total / max) * 100}%`, background: color }} />
+      {items.map((item, i) => {
+        const pct = total > 0 ? Math.round((item.total / total) * 100) : 0;
+        const fillW = `${(item.total / max) * 100}%`;
+        return (
+          <div key={item.label} className="oBarRow">
+            <span className="oRank">{i + 1}</span>
+            <div className="oBarLabel" title={item.label}>{item.label}</div>
+            <div className="oBarTrack">
+              <div
+                className="oBarFill"
+                style={{
+                  width: fillW,
+                  background: GRADIENTS[variant],
+                  boxShadow: SHADOWS[variant],
+                }}
+              />
+            </div>
+            <div className="oBarMeta">
+              <span className="oBarValue">{eur(item.total)}</span>
+              <span className="oBarPct">{pct}%</span>
+            </div>
           </div>
-          <div className="oBarMeta">
-            <span className="oBarValue">{eur(item.total)}</span>
-            <span className="oBarCount">{item.count}×</span>
-          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const KPI_ICONS = {
+  omzet: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+    </svg>
+  ),
+  reparaties: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+  ),
+  gemiddeld: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+    </svg>
+  ),
+};
+
+function KpiCard({
+  label, value, sub, variant, icon,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  variant: "blue" | "purple" | "green";
+  icon: React.ReactNode;
+}) {
+  const colors = {
+    blue:   { from: "#3B82F6", to: "#2563EB", light: "#EFF6FF", text: "#1D4ED8" },
+    purple: { from: "#8B5CF6", to: "#7C3AED", light: "#F5F3FF", text: "#6D28D9" },
+    green:  { from: "#10B981", to: "#059669", light: "#ECFDF5", text: "#065F46" },
+  }[variant];
+
+  return (
+    <div className="oKpi" style={{ "--accent-from": colors.from, "--accent-to": colors.to } as any}>
+      <div className="oKpiTop">
+        <div className="oKpiLabel">{label}</div>
+        <div className="oKpiIcon" style={{ background: colors.light, color: colors.text }}>
+          {icon}
         </div>
-      ))}
+      </div>
+      <div className="oKpiValue" style={{ color: colors.text }}>{value}</div>
+      <div className="oKpiSub">{sub}</div>
     </div>
   );
 }
@@ -80,19 +161,19 @@ function Bars({ data, limit = 8, color = "#3B82F6" }: { data: GroupRow[]; limit?
 export default function OmzetPage() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [fetchError, setFetchError] = useState("");
 
   const supabase = useMemo(() => buildClient(), []);
 
   useEffect(() => {
-    if (!supabase) { setError("Supabase env ontbreekt."); setLoading(false); return; }
+    if (!supabase) { setFetchError("Supabase env ontbreekt."); setLoading(false); return; }
     supabase
       .from("repair_requests")
       .select("id, created_at, brand, model, issue, price_text")
       .eq("status", "approved")
       .order("created_at", { ascending: false })
-      .then(({ data, error: err }) => {
-        if (err) { setError("Fout bij laden."); setLoading(false); return; }
+      .then(({ data, error }) => {
+        if (error) { setFetchError("Fout bij laden."); setLoading(false); return; }
         setRows(data || []);
         setLoading(false);
       });
@@ -113,41 +194,47 @@ export default function OmzetPage() {
       <header className="oHeader">
         <div className="oTitle">Omzet</div>
         {loading && <span className="oStatusText">Laden…</span>}
-        {error && <span className="oStatusText" style={{ color: "#EF4444" }}>{error}</span>}
+        {fetchError && <span className="oStatusText" style={{ color: "#EF4444" }}>{fetchError}</span>}
       </header>
 
       <main className="oMain">
         <div className="oKpiGrid">
-          <div className="oKpi">
-            <div className="oKpiLabel">Totale omzet</div>
-            <div className="oKpiValue">{loading ? "–" : eur(totalOmzet)}</div>
-            <div className="oKpiSub">{withPrice.length} reparaties met prijs</div>
-          </div>
-          <div className="oKpi">
-            <div className="oKpiLabel">Afgeronde reparaties</div>
-            <div className="oKpiValue">{loading ? "–" : rows.length}</div>
-            <div className="oKpiSub">{rows.length - withPrice.length} zonder prijs</div>
-          </div>
-          <div className="oKpi">
-            <div className="oKpiLabel">Gemiddelde prijs</div>
-            <div className="oKpiValue">{loading ? "–" : withPrice.length ? eur(gemiddeld) : "–"}</div>
-            <div className="oKpiSub">per reparatie</div>
-          </div>
+          <KpiCard
+            label="Totale omzet"
+            value={loading ? "–" : eur(totalOmzet)}
+            sub={`${withPrice.length} reparaties met prijs`}
+            variant="blue"
+            icon={KPI_ICONS.omzet}
+          />
+          <KpiCard
+            label="Afgeronde reparaties"
+            value={loading ? "–" : String(rows.length)}
+            sub={`${rows.length - withPrice.length} zonder prijs`}
+            variant="purple"
+            icon={KPI_ICONS.reparaties}
+          />
+          <KpiCard
+            label="Gemiddelde prijs"
+            value={loading ? "–" : withPrice.length ? eur(gemiddeld) : "–"}
+            sub="per reparatie"
+            variant="green"
+            icon={KPI_ICONS.gemiddeld}
+          />
         </div>
 
         <div className="oCard">
-          <div className="oCardTitle">Omzet per maand</div>
-          <Bars data={byMonth} limit={12} color="#3B82F6" />
+          <div className="oCardTitle oCardTitleBlue">Omzet per maand</div>
+          <Bars data={byMonth} limit={12} variant="blue" grandTotal={totalOmzet} />
         </div>
 
         <div className="oTwoCol">
           <div className="oCard">
-            <div className="oCardTitle">Per merk</div>
-            <Bars data={byBrand} color="#8B5CF6" />
+            <div className="oCardTitle oCardTitlePurple">Per merk</div>
+            <Bars data={byBrand} variant="purple" grandTotal={totalOmzet} />
           </div>
           <div className="oCard">
-            <div className="oCardTitle">Per reparatietype</div>
-            <Bars data={byIssue} color="#10B981" />
+            <div className="oCardTitle oCardTitleGreen">Per reparatietype</div>
+            <Bars data={byIssue} variant="green" grandTotal={totalOmzet} />
           </div>
         </div>
       </main>
@@ -156,6 +243,9 @@ export default function OmzetPage() {
 }
 
 const css = `
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #F8FAFC; }
+
 .oHeader {
   position: sticky;
   top: 0;
@@ -177,20 +267,18 @@ const css = `
   letter-spacing: -0.02em;
 }
 
-.oStatusText {
-  font-size: 13px;
-  color: #94A3B8;
-}
+.oStatusText { font-size: 13px; color: #94A3B8; }
 
 .oMain {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
+/* ── KPI grid ── */
 .oKpiGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -200,8 +288,32 @@ const css = `
 .oKpi {
   background: #fff;
   border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 20px 24px;
+  border-radius: 16px;
+  padding: 22px 24px 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.oKpi:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.oKpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+}
+
+.oKpiTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
 .oKpiLabel {
@@ -210,14 +322,22 @@ const css = `
   color: #94A3B8;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  margin-bottom: 8px;
+}
+
+.oKpiIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .oKpiValue {
-  font-size: 30px;
-  font-weight: 700;
-  color: #0F172A;
-  letter-spacing: -0.03em;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   line-height: 1;
   margin-bottom: 6px;
 }
@@ -225,13 +345,16 @@ const css = `
 .oKpiSub {
   font-size: 12px;
   color: #94A3B8;
+  font-weight: 500;
 }
 
+/* ── Cards ── */
 .oCard {
   background: #fff;
   border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 20px 24px;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 .oCardTitle {
@@ -239,8 +362,14 @@ const css = `
   font-weight: 700;
   color: #0F172A;
   letter-spacing: -0.01em;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  padding-left: 10px;
+  border-left: 3px solid transparent;
 }
+
+.oCardTitleBlue   { border-color: #3B82F6; }
+.oCardTitlePurple { border-color: #8B5CF6; }
+.oCardTitleGreen  { border-color: #10B981; }
 
 .oTwoCol {
   display: grid;
@@ -248,17 +377,26 @@ const css = `
   gap: 20px;
 }
 
+/* ── Bars ── */
 .oBars {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 
 .oBarRow {
   display: grid;
-  grid-template-columns: 150px 1fr 150px;
+  grid-template-columns: 24px 140px 1fr 160px;
   align-items: center;
   gap: 12px;
+}
+
+.oRank {
+  font-size: 11px;
+  font-weight: 700;
+  color: #CBD5E1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .oBarLabel {
@@ -271,16 +409,16 @@ const css = `
 }
 
 .oBarTrack {
-  height: 8px;
+  height: 10px;
   background: #F1F5F9;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .oBarFill {
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.5s ease;
+  border-radius: 6px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .oBarMeta {
@@ -294,19 +432,22 @@ const css = `
   font-size: 13px;
   font-weight: 700;
   color: #0F172A;
+  font-variant-numeric: tabular-nums;
 }
 
-.oBarCount {
+.oBarPct {
   font-size: 11px;
+  font-weight: 600;
   color: #94A3B8;
-  min-width: 20px;
+  min-width: 32px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .oEmpty {
   font-size: 13px;
   color: #94A3B8;
-  padding: 20px 0;
+  padding: 24px 0;
   text-align: center;
 }
 
@@ -317,6 +458,7 @@ const css = `
 @media (max-width: 640px) {
   .oKpiGrid { grid-template-columns: 1fr; }
   .oMain { padding: 16px; }
-  .oBarRow { grid-template-columns: 90px 1fr 110px; }
+  .oBarRow { grid-template-columns: 20px 80px 1fr 110px; gap: 8px; }
+  .oKpiValue { font-size: 26px; }
 }
 `;
