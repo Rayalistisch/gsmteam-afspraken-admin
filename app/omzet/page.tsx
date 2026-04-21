@@ -111,47 +111,23 @@ function Bars({
   );
 }
 
-const KPI_ICONS = {
-  omzet: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-    </svg>
-  ),
-  reparaties: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-    </svg>
-  ),
-  gemiddeld: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-    </svg>
-  ),
-};
-
 function KpiCard({
-  label, value, sub, variant, icon,
+  label, value, sub, variant,
 }: {
   label: string;
   value: string;
   sub: string;
   variant: "blue" | "purple" | "green";
-  icon: React.ReactNode;
 }) {
   const colors = {
-    blue:   { from: "#3B82F6", to: "#2563EB", light: "#EFF6FF", text: "#1D4ED8" },
-    purple: { from: "#8B5CF6", to: "#7C3AED", light: "#F5F3FF", text: "#6D28D9" },
-    green:  { from: "#10B981", to: "#059669", light: "#ECFDF5", text: "#065F46" },
+    blue:   { from: "#3B82F6", to: "#2563EB", text: "#1D4ED8" },
+    purple: { from: "#8B5CF6", to: "#7C3AED", text: "#6D28D9" },
+    green:  { from: "#10B981", to: "#059669", text: "#065F46" },
   }[variant];
 
   return (
     <div className="oKpi" style={{ "--accent-from": colors.from, "--accent-to": colors.to } as any}>
-      <div className="oKpiTop">
-        <div className="oKpiLabel">{label}</div>
-        <div className="oKpiIcon" style={{ background: colors.light, color: colors.text }}>
-          {icon}
-        </div>
-      </div>
+      <div className="oKpiLabel">{label}</div>
       <div className="oKpiValue" style={{ color: colors.text }}>{value}</div>
       <div className="oKpiSub">{sub}</div>
     </div>
@@ -204,21 +180,18 @@ export default function OmzetPage() {
             value={loading ? "–" : eur(totalOmzet)}
             sub={`${withPrice.length} reparaties met prijs`}
             variant="blue"
-            icon={KPI_ICONS.omzet}
           />
           <KpiCard
             label="Afgeronde reparaties"
             value={loading ? "–" : String(rows.length)}
             sub={`${rows.length - withPrice.length} zonder prijs`}
             variant="purple"
-            icon={KPI_ICONS.reparaties}
           />
           <KpiCard
             label="Gemiddelde prijs"
             value={loading ? "–" : withPrice.length ? eur(gemiddeld) : "–"}
             sub="per reparatie"
             variant="green"
-            icon={KPI_ICONS.gemiddeld}
           />
         </div>
 
@@ -309,29 +282,13 @@ body { background: #F8FAFC; }
   background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
 }
 
-.oKpiTop {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
 .oKpiLabel {
   font-size: 11px;
   font-weight: 700;
   color: #94A3B8;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-}
-
-.oKpiIcon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  margin-bottom: 12px;
 }
 
 .oKpiValue {
