@@ -210,8 +210,6 @@ export async function POST(req: Request) {
       });
 
       console.log("MAILGUN SENT:", { toAddress, resp });
-
-      return json(req, { ok: true, id: data.id, mail_sent: true }, 200);
     } catch (mailErr: any) {
       console.error("MAILGUN SEND ERROR:", mailErr);
       return json(
@@ -226,6 +224,41 @@ export async function POST(req: Request) {
         200
       );
     }
+
+    // --- INTERNE NOTIFICATIE naar info@gsmteam.nl ---
+    const NOTIFY_TO = process.env.NOTIFY_EMAIL || "info@gsmteam.nl";
+    try {
+      const internalHtml = `
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111;">
+          <h2 style="margin:0 0 12px;">Nieuwe reparatie-aanvraag</h2>
+          <table style="border-collapse:collapse;width:100%;">
+            <tr><td style="padding:6px 0;color:#6b7280;width:120px;">Naam</td><td style="padding:6px 0;font-weight:600;">${safe(customer_name) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">E-mail</td><td style="padding:6px 0;">${safe(customer_email)}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Telefoon</td><td style="padding:6px 0;">${safe(insertPayload.customer_phone) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Toestel</td><td style="padding:6px 0;">${safe(toestel) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Reparatie</td><td style="padding:6px 0;">${safe(insertPayload.issue) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Kwaliteit</td><td style="padding:6px 0;">${safe(insertPayload.quality) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Richtprijs</td><td style="padding:6px 0;">${safe(insertPayload.price_text) || "-"}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;">Voorkeur</td><td style="padding:6px 0;">${safe(voorkeur) || "-"}</td></tr>
+          </table>
+          <p style="margin:16px 0 0;font-size:12px;color:#6b7280;">Referentie: ${safe(data.id)}</p>
+        </div>
+      `;
+
+      await sendMailgun({
+        apiKey: MAILGUN_API_KEY,
+        domain: MAILGUN_DOMAIN,
+        region: MAILGUN_REGION,
+        from: MAIL_FROM,
+        to: MAIL_DEBUG_TO || NOTIFY_TO,
+        subject: `Nieuwe aanvraag: ${safe(toestel) || "onbekend toestel"} – ${safe(customer_name) || customer_email}`,
+        html: internalHtml,
+      });
+    } catch (notifyErr: any) {
+      console.error("NOTIFY MAIL ERROR:", notifyErr);
+    }
+
+    return json(req, { ok: true, id: data.id, mail_sent: true }, 200);
   } catch (err: any) {
     console.error("create-request error:", err);
     return json(req, { error: "Server error", detail: safe(err?.message) }, 500);
