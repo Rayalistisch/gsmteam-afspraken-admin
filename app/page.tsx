@@ -81,8 +81,8 @@ const IconSearch = () => (
 
 const filterConfig = [
   { key: "pending" as const, label: "Openstaand", shortLabel: "Open", Icon: IconClock },
-  { key: "approved" as const, label: "Goedgekeurd", shortLabel: "Goed", Icon: IconCheck },
-  { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afwijs", Icon: IconX },
+  { key: "approved" as const, label: "Goedgekeurd", shortLabel: "Goedgekeurd", Icon: IconCheck },
+  { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afgewezen", Icon: IconX },
   { key: "all" as const, label: "Alles", shortLabel: "Alles", Icon: IconList },
 ];
 

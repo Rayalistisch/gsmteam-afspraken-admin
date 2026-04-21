@@ -1,6 +1,15 @@
 "use client";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
+
+function buildClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 const navItems = [
   {
@@ -131,6 +140,23 @@ const dashStyles = `
   stroke: #2563eb;
 }
 
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #EF4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .dashWrap { display: block; }
@@ -139,6 +165,24 @@ const dashStyles = `
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const client = buildClient();
+    if (!client) return;
+
+    async function fetchCount() {
+      const { count } = await client!
+        .from("repair_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      setPendingCount(count ?? 0);
+    }
+
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="dashWrap">
@@ -156,6 +200,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <div className="sidebarSection">Menu</div>
           {navItems.map(({ href, label, icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href);
+            const showBadge = href === "/" && pendingCount !== null && pendingCount > 0;
             return (
               <Link
                 key={href}
@@ -163,7 +208,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 className={`sidebarItem${active ? " sidebarItemActive" : ""}`}
               >
                 {icon}
-                <span>{label}</span>
+                <span style={{ flex: 1 }}>{label}</span>
+                {showBadge && (
+                  <span className="navBadge">{pendingCount! > 99 ? "99+" : pendingCount}</span>
+                )}
               </Link>
             );
           })}
