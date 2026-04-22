@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 
     let q = sb
       .from("repair_catalog")
-      .select("id, brand, model, color, repair_type, quality, price")
+      .select("id, brand, model, color, repair_type, quality, price, show_quality")
       .order("brand")
       .order("model")
       .order("color")
@@ -83,6 +83,11 @@ export async function GET(req: Request) {
   }
 }
 
+function defaultShowQuality(quality: string): boolean {
+  const q = quality.toLowerCase();
+  return q === "officieel" || q === "origineel";
+}
+
 // POST /api/catalog — nieuwe reparatie toevoegen (enkelvoudig of bulk)
 export async function POST(req: Request) {
   try {
@@ -97,16 +102,20 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Maximaal 500 rijen per bulk-insert" }, { status: 400 });
       }
 
-      const rows = body.map((item: any) => ({
-        brand: cap(item.brand),
-        model: cap(item.model),
-        color: cap(item.color),
-        repair_type: cap(item.repair_type),
-        quality: safe(item.quality) || "Officieel",
-        price: item.price !== undefined && item.price !== null && item.price !== ""
-          ? Number(String(item.price).replace(",", ".")) || null
-          : null,
-      }));
+      const rows = body.map((item: any) => {
+        const quality = safe(item.quality) || "Officieel";
+        return {
+          brand: cap(item.brand),
+          model: safe(item.model),
+          color: cap(item.color),
+          repair_type: cap(item.repair_type),
+          quality,
+          price: item.price !== undefined && item.price !== null && item.price !== ""
+            ? Number(String(item.price).replace(",", ".")) || null
+            : null,
+          show_quality: item.show_quality !== undefined ? !!item.show_quality : defaultShowQuality(quality),
+        };
+      });
 
       for (const row of rows) {
         if (!row.brand || !row.model || !row.color || !row.repair_type) {
@@ -124,15 +133,17 @@ export async function POST(req: Request) {
     }
 
     // SINGLE MODE: bestaande logica
+    const quality = safe(body.quality) || "Officieel";
     const row = {
       brand: cap(body.brand),
-      model: cap(body.model),
+      model: safe(body.model),
       color: cap(body.color),
       repair_type: cap(body.repair_type),
-      quality: safe(body.quality) || "Officieel",
+      quality,
       price: body.price !== "" && body.price !== null && body.price !== undefined
         ? Number(String(body.price).replace(",", ".")) || null
         : null,
+      show_quality: body.show_quality !== undefined ? !!body.show_quality : defaultShowQuality(quality),
     };
 
     if (!row.brand || !row.model || !row.color || !row.repair_type) {
@@ -166,6 +177,7 @@ export async function PATCH(req: Request) {
     if (body.color !== undefined) patch.color = cap(body.color);
     if (body.model !== undefined) patch.model = cap(body.model);
     if (body.brand !== undefined) patch.brand = cap(body.brand);
+    if (body.show_quality !== undefined) patch.show_quality = !!body.show_quality;
 
     const sb = getAdmin();
     const { error } = await sb.from("repair_catalog").update(patch).eq("id", id);

@@ -11,11 +11,12 @@ type Row = {
   repair_type: string;
   quality: string;
   price: number | null;
+  show_quality: boolean;
 };
 
 
 const REGULAR_REPAIR_TYPES = [
-  "Schermmodule", "Batterij", "Achterpaneel", "Behuizing",
+  "Schermmodule", "Glas (Touchscreen)", "Display (LCD)", "Batterij", "Achterpaneel", "Behuizing",
   "Camera achterzijde", "Camera voorzijde", "Cameraglas",
   "Luidspreker", "Oplaadpoort",
 ];
@@ -111,6 +112,19 @@ export default function CatalogusPage() {
     setBusyId(null);
     if (res.ok) { setEditId(null); load(true); }
     else setStatus("Fout bij opslaan.");
+  }
+
+  async function saveShowQuality(id: string, value: boolean) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, show_quality: value } : r));
+    const res = await fetch("/api/catalog", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, show_quality: value }),
+    });
+    if (!res.ok) {
+      setRows(prev => prev.map(r => r.id === id ? { ...r, show_quality: !value } : r));
+      setStatus("Fout bij opslaan.");
+    }
   }
 
   async function deleteRow(id: string, label: string) {
@@ -683,12 +697,13 @@ export default function CatalogusPage() {
                 <th>Reparatietype</th>
                 <th>Kwaliteit</th>
                 <th>Prijs</th>
+                <th title="Toon kwaliteitskeuze aan klant">Toon</th>
                 <th>Acties</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: "center", padding: "24px", color: "#94a3b8" }}>Geen reparaties gevonden.</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: "center", padding: "24px", color: "#94a3b8" }}>Geen reparaties gevonden.</td></tr>
               )}
               {rows.map(r => (
                 <tr key={r.id}>
@@ -713,6 +728,16 @@ export default function CatalogusPage() {
                         {fmtPrice(r.price)}
                       </span>
                     )}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!r.show_quality}
+                      disabled={busyId === r.id}
+                      onChange={e => saveShowQuality(r.id, e.target.checked)}
+                      title="Toon kwaliteitskeuze aan klant"
+                      style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0c86ad" }}
+                    />
                   </td>
                   <td style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {editId === r.id ? (
