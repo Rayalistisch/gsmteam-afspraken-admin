@@ -32,7 +32,7 @@ function PinPad() {
         body: JSON.stringify({ pin: currentPin }),
       });
       if (res.ok) {
-        router.refresh();
+        await new Promise((r) => setTimeout(r, 150));
         router.push(from);
       } else {
         setPin("");
@@ -46,6 +46,7 @@ function PinPad() {
       setLoading(false);
     }
   }, [from, router]);
+
 
   const handleKey = useCallback((key: string) => {
     if (loading) return;
