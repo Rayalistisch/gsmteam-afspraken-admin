@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 const KEYS = [
@@ -12,6 +12,7 @@ const KEYS = [
 ];
 
 function PinPad() {
+  const router = useRouter();
   const params = useSearchParams();
   const from = params.get("from") || "/";
 
@@ -31,7 +32,8 @@ function PinPad() {
         body: JSON.stringify({ pin: currentPin }),
       });
       if (res.ok) {
-        window.location.href = from;
+        router.refresh();
+        router.push(from);
       } else {
         setPin("");
         setError("Onjuiste pincode");
@@ -43,7 +45,7 @@ function PinPad() {
     } finally {
       setLoading(false);
     }
-  }, [from]);
+  }, [from, router]);
 
   const handleKey = useCallback((key: string) => {
     if (loading) return;
