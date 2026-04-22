@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardShell from "./components/DashboardShell";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type Row = any;
 
@@ -35,13 +34,6 @@ function getNewness(row: any): "new" | "used" | "unknown" {
   return "unknown";
 }
 
-// Maak client pas aan tijdens runtime (en niet tijdens build/prerender)
-function buildSupabaseClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
 
 type Draft = {
   price_text: string;
@@ -80,7 +72,7 @@ const IconSearch = () => (
 );
 
 const filterConfig = [
-  { key: "pending" as const, label: "Openstaand", shortLabel: "Open", Icon: IconClock },
+  { key: "pending" as const, label: "Openstaand", shortLabel: "Openstaand", Icon: IconClock },
   { key: "approved" as const, label: "Goedgekeurd", shortLabel: "Goedgekeurd", Icon: IconCheck },
   { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afgewezen", Icon: IconX },
   { key: "all" as const, label: "Alles", shortLabel: "Alles", Icon: IconList },
@@ -117,8 +109,6 @@ export default function AdminPage() {
     save_to_catalog: false,
   });
 
-  const supabase = useMemo(() => buildSupabaseClient(), []);
-
   const visibleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
@@ -150,34 +140,27 @@ export default function AdminPage() {
   }, [rows, query]);
 
   async function load(silent = false) {
-    if (!supabase) {
-      setRows([]);
-      setStatus("Supabase env ontbreekt (NEXT_PUBLIC_SUPABASE_URL/ANON_KEY).");
-      return;
-    }
-
     if (!silent) setStatus("Aanvragen laden…");
 
-    let q = supabase
-      .from("repair_requests")
-      .select(
-        "id, created_at, customer_name, customer_email, customer_phone, brand, model, color, issue, price_text, preferred_date, preferred_time, status, condition, quality, warranty, notes"
-      )
-      .order("created_at", { ascending: false });
+    try {
+      const params = filter !== "all" ? `?status=${filter}` : "";
+      const res = await fetch(`/api/requests${params}`);
+      const data = await res.json();
 
-    if (filter !== "all") q = q.eq("status", filter);
+      if (!res.ok) {
+        console.error(data);
+        setRows([]);
+        setStatus("Fout bij ophalen.");
+        return;
+      }
 
-    const { data, error } = await q;
-
-    if (error) {
-      console.error(error);
+      setRows(data || []);
+      setStatus(silent ? `Live (${(data || []).length})` : `Aanvragen geladen (${(data || []).length}).`);
+    } catch (e) {
+      console.error(e);
       setRows([]);
-      setStatus("Fout bij ophalen.");
-      return;
+      setStatus("Netwerkfout bij ophalen.");
     }
-
-    setRows(data || []);
-    setStatus(silent ? `Live (${(data || []).length})` : `Aanvragen geladen (${(data || []).length}).`);
   }
 
   async function approve(id: string) {
