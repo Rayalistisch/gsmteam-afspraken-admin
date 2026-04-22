@@ -11,6 +11,7 @@ type Row = {
   repair_type: string;
   quality: string;
   price: number | null;
+  show_quality: boolean;
 };
 
 
@@ -22,20 +23,26 @@ const REGULAR_REPAIR_TYPES = [
 const SERVICE_REPAIR_TYPES = ["Onderzoeken", "Reinigen", "Softwarereset", "Overige"];
 const REGULAR_QUALITIES = ["Officieel", "Compatible"];
 
-type RepairSelection = { repair_type: string; qualities: string[]; prices: Record<string, string> };
+type RepairSelection = { repair_type: string; qualities: string[]; prices: Record<string, string>; single_price: string };
 type DeviceForm = { brand: string; model: string; colors: string[]; repairs: RepairSelection[] };
 const EMPTY_DEVICE_FORM: DeviceForm = { brand: "", model: "", colors: [], repairs: [] };
 
 function buildRows(form: DeviceForm) {
-  const rows: { brand: string; model: string; color: string; repair_type: string; quality: string; price: number | null }[] = [];
+  const rows: { brand: string; model: string; color: string; repair_type: string; quality: string; price: number | null; show_quality: boolean }[] = [];
   const brand = form.brand.trim();
   const model = form.model.trim();
   for (const color of form.colors) {
     for (const repair of form.repairs) {
-      for (const quality of repair.qualities) {
-        const priceStr = (repair.prices[quality] || "").trim().replace(",", ".");
+      if (repair.qualities.length === 0) {
+        const priceStr = (repair.single_price || "").trim().replace(",", ".");
         const price = priceStr !== "" ? Number(priceStr) || null : null;
-        rows.push({ brand, model, color: color.trim(), repair_type: repair.repair_type, quality, price });
+        rows.push({ brand, model, color: color.trim(), repair_type: repair.repair_type, quality: "Standaard", price, show_quality: false });
+      } else {
+        for (const quality of repair.qualities) {
+          const priceStr = (repair.prices[quality] || "").trim().replace(",", ".");
+          const price = priceStr !== "" ? Number(priceStr) || null : null;
+          rows.push({ brand, model, color: color.trim(), repair_type: repair.repair_type, quality, price, show_quality: true });
+        }
       }
     }
   }
@@ -47,10 +54,12 @@ function validateDeviceForm(form: DeviceForm): string | null {
   if (!form.model.trim()) return "Vul een model in.";
   if (form.colors.length === 0) return "Voeg minimaal één kleur toe.";
   if (form.repairs.length === 0) return "Selecteer minimaal één reparatietype.";
-  for (const r of form.repairs) {
-    if (r.qualities.length === 0) return `Selecteer minimaal één kwaliteit voor "${r.repair_type}".`;
-  }
   return null;
+}
+
+function guessSeries(model: string): string {
+  const parts = model.trim().split(/\s+/);
+  return parts.slice(0, 2).join(" ");
 }
 
 export default function CatalogusPage() {
@@ -61,7 +70,11 @@ export default function CatalogusPage() {
   const [brands, setBrands] = useState<string[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
+  const [editShowQuality, setEditShowQuality] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkRow, setBulkRow] = useState<Row | null>(null);
+  const [bulkPrefix, setBulkPrefix] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [addBrand, setAddBrand] = useState("");
   const [addModel, setAddModel] = useState("");
@@ -101,16 +114,42 @@ export default function CatalogusPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function savePrice(id: string) {
+  async function savePrice(id: string, row: Row) {
     setBusyId(id);
     const res = await fetch("/api/catalog", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, price: editPrice }),
+      body: JSON.stringify({ id, price: editPrice, show_quality: editShowQuality }),
     });
     setBusyId(null);
-    if (res.ok) { setEditId(null); load(true); }
-    else setStatus("Fout bij opslaan.");
+    if (res.ok) {
+      setEditId(null);
+      load(true);
+      setBulkRow({ ...row, price: editPrice !== "" ? Number(editPrice.replace(",", ".")) || null : null, show_quality: editShowQuality });
+      setBulkPrefix(guessSeries(row.model));
+    } else {
+      setStatus("Fout bij opslaan.");
+    }
+  }
+
+  async function applyBulkPrice() {
+    if (!bulkRow) return;
+    setBulkBusy(true);
+    const res = await fetch("/api/catalog", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bulk: true,
+        brand: bulkRow.brand,
+        model_prefix: bulkPrefix,
+        repair_type: bulkRow.repair_type,
+        quality: bulkRow.quality,
+        price: bulkRow.price,
+      }),
+    });
+    setBulkBusy(false);
+    if (res.ok) { setBulkRow(null); load(true); setStatus(`Prijs toegepast op alle modellen die beginnen met "${bulkPrefix}".`); }
+    else setStatus("Fout bij bulk update.");
   }
 
   async function deleteRow(id: string, label: string) {
@@ -161,7 +200,7 @@ export default function CatalogusPage() {
     setAddRepairs(rs => {
       const exists = rs.find(r => r.repair_type === repair_type);
       if (exists) return rs.filter(r => r.repair_type !== repair_type);
-      return [...rs, { repair_type, qualities: forService ? ["Standaard"] : [], prices: {} }];
+      return [...rs, { repair_type, qualities: forService ? ["Standaard"] : [], prices: {}, single_price: "" }];
     });
   }
 
@@ -178,6 +217,12 @@ export default function CatalogusPage() {
   function setAddRepairPrice(repair_type: string, quality: string, price: string) {
     setAddRepairs(rs => rs.map(r =>
       r.repair_type !== repair_type ? r : { ...r, prices: { ...r.prices, [quality]: price } }
+    ));
+  }
+
+  function setAddRepairSinglePrice(repair_type: string, price: string) {
+    setAddRepairs(rs => rs.map(r =>
+      r.repair_type !== repair_type ? r : { ...r, single_price: price }
     ));
   }
 
@@ -223,7 +268,7 @@ export default function CatalogusPage() {
     setDeviceForm(f => {
       const exists = f.repairs.find(r => r.repair_type === repair_type);
       if (exists) return { ...f, repairs: f.repairs.filter(r => r.repair_type !== repair_type) };
-      return { ...f, repairs: [...f.repairs, { repair_type, qualities: forService ? ["Standaard"] : [], prices: {} }] };
+      return { ...f, repairs: [...f.repairs, { repair_type, qualities: forService ? ["Standaard"] : [], prices: {}, single_price: "" }] };
     });
   }
 
@@ -245,6 +290,15 @@ export default function CatalogusPage() {
       ...f,
       repairs: f.repairs.map(r =>
         r.repair_type !== repair_type ? r : { ...r, prices: { ...r.prices, [quality]: price } }
+      ),
+    }));
+  }
+
+  function setDeviceSinglePrice(repair_type: string, price: string) {
+    setDeviceForm(f => ({
+      ...f,
+      repairs: f.repairs.map(r =>
+        r.repair_type !== repair_type ? r : { ...r, single_price: price }
       ),
     }));
   }
@@ -477,7 +531,7 @@ export default function CatalogusPage() {
                           {rt}
                         </label>
                         {sel && (
-                          <div className="quality-row">
+                          <div className="quality-row" style={{ flexWrap: "wrap", gap: "10px" }}>
                             {REGULAR_QUALITIES.map(q => (
                               <div key={q} className="quality-check-row">
                                 <label className="quality-check">
@@ -495,6 +549,18 @@ export default function CatalogusPage() {
                                 )}
                               </div>
                             ))}
+                            {sel.qualities.length === 0 && (
+                              <div className="quality-check-row">
+                                <span style={{ fontSize: "12px", color: "#475569", minWidth: "46px" }}>Prijs</span>
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  className="quality-price-input"
+                                  placeholder="Op aanvraag"
+                                  value={sel.single_price || ""}
+                                  onChange={e => setAddRepairSinglePrice(rt, e.target.value)}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -595,7 +661,7 @@ export default function CatalogusPage() {
                         {rt}
                       </label>
                       {sel && (
-                        <div className="quality-row">
+                        <div className="quality-row" style={{ flexWrap: "wrap", gap: "10px" }}>
                           {REGULAR_QUALITIES.map(q => (
                             <div key={q} className="quality-check-row">
                               <label className="quality-check">
@@ -619,6 +685,20 @@ export default function CatalogusPage() {
                               )}
                             </div>
                           ))}
+                          {sel.qualities.length === 0 && (
+                            <div className="quality-check-row">
+                              <span style={{ fontSize: "12px", color: "#475569", minWidth: "46px" }}>Prijs</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="quality-price-input"
+                                placeholder="Op aanvraag"
+                                value={sel.single_price || ""}
+                                onChange={e => setDeviceSinglePrice(rt, e.target.value)}
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -673,6 +753,29 @@ export default function CatalogusPage() {
           <button className="btn btn-ghost" onClick={() => load()}>Vernieuwen</button>
         </div>
 
+        {bulkRow && (
+          <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "10px", padding: "14px 18px", marginBottom: "16px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "#92400e" }}>
+              Prijs ook toepassen op andere {bulkRow.brand} modellen?
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "#0f172a" }}>
+              <span style={{ color: "#64748b" }}>Serie prefix:</span>
+              <input
+                value={bulkPrefix}
+                onChange={e => setBulkPrefix(e.target.value)}
+                style={{ padding: "4px 8px", border: "1px solid #fcd34d", borderRadius: "6px", fontSize: "13px", width: "160px" }}
+                placeholder="bijv. iPhone 15"
+              />
+            </div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button className="btn btn-primary" style={{ background: "#d97706" }} disabled={bulkBusy || !bulkPrefix.trim()} onClick={applyBulkPrice}>
+                {bulkBusy ? "Bezig…" : `Toepassen op alle "${bulkPrefix}" modellen`}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setBulkRow(null)}>Overslaan</button>
+            </div>
+          </div>
+        )}
+
         <div className="cat-table-wrap">
           <table>
             <thead>
@@ -696,20 +799,31 @@ export default function CatalogusPage() {
                   <td>{r.model}</td>
                   <td>{r.color}</td>
                   <td>{r.repair_type}</td>
-                  <td>{r.quality}</td>
+                  <td>
+                    {r.quality}
+                    {r.show_quality === false && (
+                      <span style={{ marginLeft: "5px", fontSize: "10px", background: "#f1f5f9", color: "#94a3b8", borderRadius: "4px", padding: "1px 5px", fontWeight: 600 }}>verborgen</span>
+                    )}
+                  </td>
                   <td>
                     {editId === r.id ? (
-                      <input
-                        className="price-input"
-                        type="number"
-                        step="0.01"
-                        value={editPrice}
-                        onChange={e => setEditPrice(e.target.value)}
-                        autoFocus
-                        onKeyDown={e => { if (e.key === "Enter") savePrice(r.id); if (e.key === "Escape") setEditId(null); }}
-                      />
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <input
+                          className="price-input"
+                          type="number"
+                          step="0.01"
+                          value={editPrice}
+                          onChange={e => setEditPrice(e.target.value)}
+                          autoFocus
+                          onKeyDown={e => { if (e.key === "Enter") savePrice(r.id, r); if (e.key === "Escape") setEditId(null); }}
+                        />
+                        <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "#475569", cursor: "pointer", whiteSpace: "nowrap" }}>
+                          <input type="checkbox" checked={editShowQuality} onChange={e => setEditShowQuality(e.target.checked)} style={{ accentColor: "#16a34a" }} />
+                          Toon kwaliteit
+                        </label>
+                      </div>
                     ) : (
-                      <span onClick={() => { setEditId(r.id); setEditPrice(r.price != null ? String(r.price) : ""); }} style={{ cursor: "pointer" }}>
+                      <span onClick={() => { setEditId(r.id); setEditPrice(r.price != null ? String(r.price) : ""); setEditShowQuality(r.show_quality !== false); setBulkRow(null); }} style={{ cursor: "pointer" }}>
                         {fmtPrice(r.price)}
                       </span>
                     )}
@@ -717,15 +831,15 @@ export default function CatalogusPage() {
                   <td style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {editId === r.id ? (
                       <>
-                        <button className="btn btn-primary" disabled={busyId === r.id} onClick={() => savePrice(r.id)}>
+                        <button className="btn btn-primary" disabled={busyId === r.id} onClick={() => savePrice(r.id, r)}>
                           {busyId === r.id ? "…" : "Opslaan"}
                         </button>
                         <button className="btn btn-ghost" onClick={() => setEditId(null)}>Annuleren</button>
                       </>
                     ) : (
                       <>
-                        <button className="btn btn-ghost" onClick={() => { setEditId(r.id); setEditPrice(r.price != null ? String(r.price) : ""); }}>
-                          Prijs
+                        <button className="btn btn-ghost" onClick={() => { setEditId(r.id); setEditPrice(r.price != null ? String(r.price) : ""); setEditShowQuality(r.show_quality !== false); setBulkRow(null); }}>
+                          Bewerk
                         </button>
                         <button className="btn btn-danger" disabled={busyId === r.id} onClick={() => deleteRow(r.id, `${r.brand} ${r.model} – ${r.repair_type}`)}>
                           {busyId === r.id ? "…" : "Verwijder"}
