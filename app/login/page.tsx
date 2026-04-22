@@ -43,7 +43,7 @@ function PinPad() {
     } finally {
       setLoading(false);
     }
-  }, [from, router]);
+  }, [from]);
 
   const handleKey = useCallback((key: string) => {
     if (loading) return;
