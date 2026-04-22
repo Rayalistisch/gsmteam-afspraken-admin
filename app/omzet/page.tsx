@@ -2,14 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardShell from "../components/DashboardShell";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-function buildClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
 
 function parsePrice(text: string): number | null {
   if (!text) return null;
@@ -139,21 +131,16 @@ export default function OmzetPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
 
-  const supabase = useMemo(() => buildClient(), []);
-
   useEffect(() => {
-    if (!supabase) { setFetchError("Supabase env ontbreekt."); setLoading(false); return; }
-    supabase
-      .from("repair_requests")
-      .select("id, created_at, brand, model, issue, price_text")
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) { setFetchError("Fout bij laden."); setLoading(false); return; }
-        setRows(data || []);
+    fetch("/api/requests?status=approved")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) { setFetchError("Fout bij laden."); setLoading(false); return; }
+        setRows(data);
         setLoading(false);
-      });
-  }, [supabase]);
+      })
+      .catch(() => { setFetchError("Netwerkfout bij laden."); setLoading(false); });
+  }, []);
 
   const withPrice = useMemo(() => rows.filter((r) => parsePrice(r.price_text) !== null), [rows]);
   const totalOmzet = useMemo(() => withPrice.reduce((s, r) => s + (parsePrice(r.price_text) ?? 0), 0), [withPrice]);
