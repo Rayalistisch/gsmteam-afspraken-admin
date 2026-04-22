@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 
     let q = sb
       .from("repair_catalog")
-      .select("id, brand, model, color, repair_type, quality, price, show_quality")
+      .select("id, brand, model, color, repair_type, quality, price")
       .order("brand")
       .order("model")
       .order("color")
@@ -106,7 +106,6 @@ export async function POST(req: Request) {
         price: item.price !== undefined && item.price !== null && item.price !== ""
           ? Number(String(item.price).replace(",", ".")) || null
           : null,
-        show_quality: item.show_quality !== false,
       }));
 
       for (const row of rows) {
@@ -134,7 +133,6 @@ export async function POST(req: Request) {
       price: body.price !== "" && body.price !== null && body.price !== undefined
         ? Number(String(body.price).replace(",", ".")) || null
         : null,
-      show_quality: body.show_quality !== false,
     };
 
     if (!row.brand || !row.model || !row.color || !row.repair_type) {
@@ -150,38 +148,10 @@ export async function POST(req: Request) {
   }
 }
 
-// PATCH /api/catalog — prijs of kwaliteit aanpassen (enkelvoudig of bulk op serie)
+// PATCH /api/catalog — prijs of kwaliteit aanpassen
 export async function PATCH(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-
-    // BULK MODE: update prijs voor alle modellen die beginnen met model_prefix
-    if (body.bulk === true) {
-      const brand = safe(body.brand);
-      const model_prefix = safe(body.model_prefix);
-      const repair_type = safe(body.repair_type);
-      const quality = safe(body.quality);
-      if (!brand || !model_prefix || !repair_type) {
-        return NextResponse.json({ error: "bulk vereist brand, model_prefix en repair_type" }, { status: 400 });
-      }
-      const price = body.price !== "" && body.price !== null && body.price !== undefined
-        ? Number(String(body.price).replace(",", ".")) || null
-        : null;
-
-      const sb = getAdmin();
-      let q = sb
-        .from("repair_catalog")
-        .update({ price })
-        .eq("brand", brand)
-        .eq("repair_type", repair_type)
-        .ilike("model", `${model_prefix}%`);
-      if (quality) q = q.eq("quality", quality);
-      const { error } = await q;
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true });
-    }
-
-    // SINGLE MODE
     const id = safe(body.id);
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
@@ -196,7 +166,6 @@ export async function PATCH(req: Request) {
     if (body.color !== undefined) patch.color = cap(body.color);
     if (body.model !== undefined) patch.model = cap(body.model);
     if (body.brand !== undefined) patch.brand = cap(body.brand);
-    if (body.show_quality !== undefined) patch.show_quality = body.show_quality !== false;
 
     const sb = getAdmin();
     const { error } = await sb.from("repair_catalog").update(patch).eq("id", id);
