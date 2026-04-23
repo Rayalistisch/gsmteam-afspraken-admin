@@ -37,12 +37,18 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
   // Voeg logo.png toe aan de public map om het logo in de PDF te tonen.
   let logoPlaced = false;
   try {
-    const logoPath = path.join(process.cwd(), "public", "logo.png");
-    if (fs.existsSync(logoPath)) {
-      const logoData = fs.readFileSync(logoPath).toString("base64");
-      const logoH = 13;
-      doc.addImage(`data:image/png;base64,${logoData}`, "PNG", margin, y - 2, 0, logoH);
-      logoPlaced = true;
+    const candidates = ["logo.png", "logo.jpeg", "logo.jpg"];
+    for (const name of candidates) {
+      const logoPath = path.join(process.cwd(), "public", name);
+      if (fs.existsSync(logoPath)) {
+        const ext  = name.endsWith(".png") ? "PNG" : "JPEG";
+        const mime = name.endsWith(".png") ? "image/png" : "image/jpeg";
+        const logoData = fs.readFileSync(logoPath).toString("base64");
+        const logoH = 13;
+        doc.addImage(`data:${mime};base64,${logoData}`, ext, margin, y - 2, 0, logoH);
+        logoPlaced = true;
+        break;
+      }
     }
   } catch { /* valt terug op text */ }
 
