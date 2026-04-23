@@ -41,6 +41,7 @@ async function sendMailgun({
   region,
   from,
   to,
+  cc,
   subject,
   html,
   attachments,

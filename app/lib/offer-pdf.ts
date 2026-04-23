@@ -1,24 +1,11 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
-function parseEuroAmount(input?: string | null): number | null {
-  const s = String(input ?? "").trim();
-  if (!s) return null;
-  const m = s.match(/-?\d+(?:[.,]\d{1,2})?/);
-  if (!m) return null;
-  const n = Number(m[0].replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
-
-function fmtEUR(n: number) {
-  return new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(n);
-}
-
-function calcFromIncl21(incl: number) {
-  const excl = incl / 1.21;
-  const btw = incl - excl;
-  const round2 = (x: number) => Math.round(x * 100) / 100;
-  return { excl: round2(excl), btw: round2(btw), incl: round2(incl) };
-}
+// ── Kleuren (identiek aan website PDF) ──────────────────────
+const BLUE:   [number, number, number] = [12,  100, 160];
+const DARK:   [number, number, number] = [30,  35,  45];
+const MUTED:  [number, number, number] = [110, 120, 135];
+const LINE:   [number, number, number] = [210, 213, 216];
 
 export type OfferInput = {
   id: string;
@@ -36,212 +23,180 @@ export type OfferInput = {
 };
 
 export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
-  const pdfDoc = await PDFDocument.create();
-  const page   = pdfDoc.addPage([595.28, 841.89]); // A4
-  const { width, height } = page.getSize();
+  const doc    = new jsPDF({ unit: "mm", format: "a4" });
+  const pageW  = doc.internal.pageSize.getWidth();
+  const pageH  = doc.internal.pageSize.getHeight();
+  const margin = 18;
 
-  const font     = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  let y = 18;
 
-  // ── Palet ────────────────────────────────────────────────
-  const blue      = rgb(0.231, 0.510, 0.965);  // #3B82F6
-  const blueDark  = rgb(0.114, 0.306, 0.847);  // #1D4ED8
-  const dark      = rgb(0.059, 0.078, 0.102);
-  const grayLabel = rgb(0.396, 0.451, 0.529);
-  const grayLine  = rgb(0.878, 0.898, 0.929);
-  const rowAltBg  = rgb(0.969, 0.976, 0.988);
-  const white     = rgb(1, 1, 1);
+  // ── Logo (text-fallback, geen DOM beschikbaar server-side) ──
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.setTextColor(...BLUE);
+  doc.text("GSMTEAM", margin, y + 8);
 
-  const mL = 48;
-  const mR = 48;
-  const cW = width - mL - mR; // 499.28
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  doc.text("Full Service Telecom in Enschede", margin, y + 16);
 
-  let y = height;
-
-  // ── Helpers ──────────────────────────────────────────────
-
-  // Horizontale scheidingslijn
-  const divider = (gap = 14) => {
-    y -= gap;
-    page.drawLine({ start: { x: mL, y }, end: { x: width - mR, y }, thickness: 0.5, color: grayLine });
-    y -= gap;
-  };
-
-  // Sectie-koptekst (blauw vlak + witte tekst)
-  const ROW_H = 22;
-  const sectionHeader = (title: string) => {
-    page.drawRectangle({ x: mL, y: y - ROW_H, width: cW, height: ROW_H, color: blue });
-    page.drawText(title, { x: mL + 10, y: y - 15, size: 8, font: fontBold, color: white });
-    y -= ROW_H + 1;
-  };
-
-  // Tabelrij (label links, waarde rechts of op vaste kolom)
-  const tableRow = (label: string, value: string, alt: boolean, rightAlign = false) => {
-    if (alt) page.drawRectangle({ x: mL, y: y - ROW_H, width: cW, height: ROW_H, color: rowAltBg });
-    page.drawText(label, { x: mL + 10, y: y - 15, size: 10, font: fontBold, color: grayLabel });
-    if (rightAlign) {
-      const vW = font.widthOfTextAtSize(value, 10);
-      page.drawText(value, { x: width - mR - vW, y: y - 15, size: 10, font, color: dark });
-    } else {
-      page.drawText(value, { x: mL + 155, y: y - 15, size: 10, font, color: dark });
-    }
-    y -= ROW_H;
-  };
-
-  // ── HEADER BAND ──────────────────────────────────────────
-  const hH = 80;
-  page.drawRectangle({ x: 0, y: y - hH, width, height: hH, color: blue });
-
-  // Logoblok: donkerblauw vierkant met "G" erin
-  const logoSz = 44;
-  const logoX  = mL;
-  const logoY  = y - hH + (hH - logoSz) / 2;
-  page.drawRectangle({ x: logoX, y: logoY, width: logoSz, height: logoSz, color: blueDark });
-  page.drawText("G", { x: logoX + 11, y: logoY + 14, size: 24, font: fontBold, color: white });
-
-  // Bedrijfsnaam + tagline
-  page.drawText("GSM Team", { x: logoX + logoSz + 10, y: y - hH + 48, size: 20, font: fontBold, color: white });
-  page.drawText("Reparatie & Service", { x: logoX + logoSz + 10, y: y - hH + 30, size: 9, font, color: rgb(0.7, 0.82, 1) });
-
-  // "OFFERTE" rechts
-  const ofText = "OFFERTE";
-  const ofW = fontBold.widthOfTextAtSize(ofText, 24);
-  page.drawText(ofText, { x: width - mR - ofW, y: y - hH + 33, size: 24, font: fontBold, color: white });
-
-  y -= hH;
-
-  // Accentlijn onder header
-  page.drawRectangle({ x: 0, y: y - 3, width, height: 3, color: blueDark });
-  y -= 3;
-
-  // ── DOCUMENT-INFO ─────────────────────────────────────────
-  y -= 18;
-
-  // Links: referentienummer
-  page.drawText("REFERENTIENUMMER", { x: mL, y, size: 7, font: fontBold, color: grayLabel });
-  page.drawText(input.id || "-", { x: mL, y: y - 14, size: 11, font: fontBold, color: dark });
-
-  // Rechts: datum
-  let dateStr = "";
-  if (input.preferred_date) {
-    try {
-      const d = new Date(input.preferred_date + "T00:00:00");
-      dateStr = d.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
-    } catch { dateStr = input.preferred_date; }
-  } else {
-    dateStr = new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
-  }
-  const dateLabel = "DATUM OFFERTE";
-  const dateValW  = fontBold.widthOfTextAtSize(dateStr, 11);
-  const dateLblW  = fontBold.widthOfTextAtSize(dateLabel, 7);
-  page.drawText(dateLabel, { x: width - mR - dateLblW, y, size: 7, font: fontBold, color: grayLabel });
-  page.drawText(dateStr,   { x: width - mR - dateValW, y: y - 14, size: 11, font: fontBold, color: dark });
-
-  y -= 32;
-
-  // ── KLANTGEGEVENS & APPARAAT (twee kolommen) ─────────────
-  divider(0);
-  y -= 14;
-
-  const colW = (cW - 24) / 2;
-
-  // Kolomkoppen
-  page.drawText("KLANTGEGEVENS", { x: mL, y, size: 7, font: fontBold, color: blue });
-  page.drawLine({ start: { x: mL, y: y - 3 }, end: { x: mL + colW, y: y - 3 }, thickness: 1, color: blue });
-
-  page.drawText("APPARAAT", { x: mL + colW + 24, y, size: 7, font: fontBold, color: blue });
-  page.drawLine({ start: { x: mL + colW + 24, y: y - 3 }, end: { x: width - mR, y: y - 3 }, thickness: 1, color: blue });
-
-  y -= 16;
-
-  // Klantgegevens links
-  const clientRows: [string, string?][] = [
-    ["Naam",     input.customer_name],
-    ["E-mail",   input.customer_email],
-    ["Telefoon", input.customer_phone],
+  // ── Adresblok rechts ─────────────────────────────────────
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  const adresLines = [
+    "A  Floresstraat 16A",
+    "    7512 ZR Enschede",
+    "T  053-4363949",
+    "E  info@gsmteam.nl",
   ];
-  let leftY = y;
-  for (const [k, v] of clientRows) {
-    if (!v) continue;
-    page.drawText(k, { x: mL, y: leftY, size: 8, font: fontBold, color: grayLabel });
-    page.drawText(v, { x: mL, y: leftY - 12, size: 10, font, color: dark });
-    leftY -= 26;
-  }
-
-  // Apparaatgegevens rechts
-  const deviceRows: [string, string?][] = [
-    ["Merk",  input.brand],
-    ["Model", input.model],
-    ["Kleur", input.color],
-  ];
-  let rightY = y;
-  for (const [k, v] of deviceRows) {
-    if (!v) continue;
-    page.drawText(k, { x: mL + colW + 24, y: rightY, size: 8, font: fontBold, color: grayLabel });
-    page.drawText(v, { x: mL + colW + 24, y: rightY - 12, size: 10, font, color: dark });
-    rightY -= 26;
-  }
-
-  y = Math.min(leftY, rightY);
-
-  // ── REPARATIEDETAILS ─────────────────────────────────────
-  divider(16);
-  sectionHeader("REPARATIEDETAILS");
-
-  const voorkeur = [input.preferred_date, input.preferred_time].filter(Boolean).join(" om ").trim();
-  const repairRows: [string, string?][] = [
-    ["Reparatie", input.issue],
-    ["Kwaliteit", input.quality],
-    ["Voorkeur",  voorkeur || undefined],
-  ];
-  let alt = false;
-  for (const [k, v] of repairRows) {
-    if (!v) continue;
-    tableRow(k, v, alt);
-    alt = !alt;
-  }
-
-  // ── PRIJSINDICATIE ────────────────────────────────────────
-  y -= 14;
-  sectionHeader("PRIJSINDICATIE");
-
-  const incl     = parseEuroAmount(input.price_text);
-  const computed = incl != null ? calcFromIncl21(incl) : null;
-
-  if (computed) {
-    alt = false;
-    tableRow("Subtotaal (excl. BTW)", fmtEUR(computed.excl), alt, true); alt = !alt;
-    tableRow("BTW (21%)",             fmtEUR(computed.btw),  alt, true); alt = !alt;
-
-    // Totaalrij: lichtblauwe achtergrond, vette blauwe prijs
-    page.drawRectangle({ x: mL, y: y - ROW_H, width: cW, height: ROW_H, color: rgb(0.937, 0.949, 0.992) });
-    page.drawText("Totaal incl. BTW", { x: mL + 10, y: y - 15, size: 11, font: fontBold, color: dark });
-    const totalStr = fmtEUR(computed.incl);
-    const totalW   = fontBold.widthOfTextAtSize(totalStr, 11);
-    page.drawText(totalStr, { x: width - mR - totalW, y: y - 15, size: 11, font: fontBold, color: blue });
-    y -= ROW_H;
-  } else {
-    tableRow("Richtprijs", input.price_text || "-", false, true);
-  }
-
-  // ── DISCLAIMER ────────────────────────────────────────────
-  y -= 18;
-  page.drawText(
-    "Deze prijs is een indicatie. De definitieve prijs volgt na controle van het toestel.",
-    { x: mL, y, size: 8, font, color: grayLabel }
-  );
-
-  // ── FOOTER ────────────────────────────────────────────────
-  page.drawLine({ start: { x: mL, y: 42 }, end: { x: width - mR, y: 42 }, thickness: 0.5, color: grayLine });
-  page.drawText("GSM Team  •  Dit document is automatisch gegenereerd.", {
-    x: mL, y: 26, size: 8, font, color: grayLabel,
+  adresLines.forEach((line, i) => {
+    doc.text(line, pageW - margin, y + i * 5.5, { align: "right" });
   });
-  const refW = font.widthOfTextAtSize(input.id, 8);
-  page.drawText(input.id, { x: width - mR - refW, y: 26, size: 8, font, color: grayLabel });
 
-  const bytes = await pdfDoc.save();
-  return Buffer.from(bytes);
+  // ── Scheidingslijn ──────────────────────────────────────
+  y += 24;
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, pageW - margin, y);
+  y += 12;
+
+  // ── Offerte-titel + datum/ref ───────────────────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(...DARK);
+  doc.text("Reparatie Offerte", margin, y);
+
+  const dateStr = new Date().toLocaleDateString("nl-NL", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text("Datum:       " + dateStr,      pageW - margin, y - 5, { align: "right" });
+  doc.text("Referentie: " + (input.id || "-"), pageW - margin, y,     { align: "right" });
+
+  y += 12;
+
+  // ── Toestel-chip ────────────────────────────────────────
+  const deviceLabel = [input.brand, input.model, input.color].filter(Boolean).join("  ·  ");
+  doc.setFillColor(243, 246, 250);
+  doc.roundedRect(margin, y, pageW - margin * 2, 18, 1.5, 1.5, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...MUTED);
+  doc.text("TOESTEL", margin + 5, y + 6);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...DARK);
+  doc.text(deviceLabel || "Onbekend toestel", margin + 5, y + 13);
+  y += 26;
+
+  // ── Klantgegevens ────────────────────────────────────────
+  const contactLine = [input.customer_phone, input.customer_email].filter(Boolean).join("   ·   ");
+  const klantLines  = [contactLine].filter(Boolean);
+  if (input.customer_name || klantLines.length) {
+    const klantH = 8 + (input.customer_name ? 7 : 0) + klantLines.length * 5.5 + 4;
+    doc.setFillColor(243, 246, 250);
+    doc.roundedRect(margin, y, pageW - margin * 2, klantH, 1.5, 1.5, "F");
+    let ky = y + 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...MUTED);
+    doc.text("KLANTGEGEVENS", margin + 5, ky);
+    ky += 7;
+    if (input.customer_name) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(...DARK);
+      doc.text(input.customer_name, margin + 5, ky);
+      ky += 5.5;
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...MUTED);
+    klantLines.forEach((line) => { doc.text(line, margin + 5, ky); ky += 5.5; });
+    y += klantH + 8;
+  }
+
+  // ── Reparaties tabel ────────────────────────────────────
+  const showQualCol = !!(input.quality?.trim());
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  doc.text("REPARATIES", margin, y);
+  y += 4;
+
+  const repairRow = showQualCol
+    ? [input.issue || "Reparatie", input.quality!, input.price_text || "Op aanvraag"]
+    : [input.issue || "Reparatie", input.price_text || "Op aanvraag"];
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [showQualCol ? ["Omschrijving", "Kwaliteit", "Prijs"] : ["Omschrijving", "Prijs"]],
+    body: [repairRow],
+    headStyles: {
+      fillColor: BLUE,
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: 8.5,
+      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
+    },
+    bodyStyles: {
+      textColor: DARK,
+      fontSize: 9.5,
+      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
+    },
+    columnStyles: showQualCol
+      ? { 2: { halign: "right", fontStyle: "bold", cellWidth: 32 } }
+      : { 1: { halign: "right", fontStyle: "bold", cellWidth: 32 } },
+    alternateRowStyles: { fillColor: [247, 249, 252] },
+    tableLineColor: [220, 225, 232],
+    tableLineWidth: 0.15,
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 14;
+
+  // ── Totaal ──────────────────────────────────────────────
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, pageW - margin, y);
+  y += 9;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...MUTED);
+  doc.text("Totaal (incl. 21% btw)", margin, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...BLUE);
+  doc.text(input.price_text || "Op aanvraag", pageW - margin, y, { align: "right" });
+
+  // ── Footer ───────────────────────────────────────────────
+  const footerY = pageH - 12;
+  doc.setDrawColor(...LINE);
+  doc.setLineWidth(0.3);
+  doc.line(margin, footerY - 7, pageW - margin, footerY - 7);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...MUTED);
+  doc.text(
+    "kvk  57887365     btw nr  NL852779690B01     iban  NL40 RABO 0153275340     bic  RABONL2U",
+    margin,
+    footerY
+  );
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...BLUE);
+  doc.text("GSMTEAM.nl", pageW - margin, footerY, { align: "right" });
+
+  return Buffer.from(doc.output("arraybuffer"));
 }
+
+// ── Email helpers ────────────────────────────────────────────
 
 function emailDetailRow(label: string, value?: string | null): string {
   if (!value) return "";
