@@ -50,6 +50,7 @@ async function sendMailgun({
   region: "eu" | "us";
   from: string;
   to: string;
+  cc?: string;
   subject: string;
   html: string;
   attachments?: Array<{ filename: string; contentType: string; data: Buffer }>;
@@ -60,6 +61,7 @@ async function sendMailgun({
   const form = new FormData();
   form.append("from", from);
   form.append("to", to);
+  if (cc) form.append("cc", cc);
   form.append("subject", subject);
   form.append("html", html);
 
@@ -167,12 +169,14 @@ export async function POST(req: Request) {
 
       const toAddress = MAIL_DEBUG_TO || customer_email;
 
+      const NOTIFY_TO = process.env.NOTIFY_EMAIL || "info@gsmteam.nl";
       await sendMailgun({
         apiKey: MAILGUN_API_KEY,
         domain: MAILGUN_DOMAIN,
         region: MAILGUN_REGION,
         from: MAIL_FROM,
         to: toAddress,
+        cc: MAIL_DEBUG_TO ? undefined : NOTIFY_TO,
         subject: MAIL_DEBUG_TO ? `[DEBUG] ${subject}` : subject,
         html,
         attachments: [
