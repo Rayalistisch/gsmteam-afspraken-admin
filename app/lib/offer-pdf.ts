@@ -1,5 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import fs from "fs";
+import path from "path";
 
 // ── Kleuren (identiek aan website PDF) ──────────────────────
 const BLUE:   [number, number, number] = [12,  100, 160];
@@ -30,11 +32,26 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
 
   let y = 18;
 
-  // ── Logo (text-fallback, geen DOM beschikbaar server-side) ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...BLUE);
-  doc.text("GSMTEAM", margin, y + 8);
+  // ── Logo ─────────────────────────────────────────────────────
+  // Plaatst public/logo.png als het bestaat, anders text-fallback.
+  // Voeg logo.png toe aan de public map om het logo in de PDF te tonen.
+  let logoPlaced = false;
+  try {
+    const logoPath = path.join(process.cwd(), "public", "logo.png");
+    if (fs.existsSync(logoPath)) {
+      const logoData = fs.readFileSync(logoPath).toString("base64");
+      const logoH = 13;
+      doc.addImage(`data:image/png;base64,${logoData}`, "PNG", margin, y - 2, 0, logoH);
+      logoPlaced = true;
+    }
+  } catch { /* valt terug op text */ }
+
+  if (!logoPlaced) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(...BLUE);
+    doc.text("GSMTEAM", margin, y + 8);
+  }
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);

@@ -137,6 +137,17 @@ export async function POST(req: Request) {
         );
       }
 
+      // Catalog-lookup: controleer of kwaliteit getoond moet worden (identiek aan website PDF)
+      const { data: catalogItem } = await supabaseAdmin
+        .from("repair_catalog")
+        .select("show_quality")
+        .ilike("brand", data.brand ?? "")
+        .ilike("model", data.model ?? "")
+        .ilike("color", data.color ?? "")
+        .ilike("repair_type", data.issue ?? "")
+        .maybeSingle();
+      const showQuality = catalogItem?.show_quality === true;
+
       const subject = "Reparatie goedgekeurd + offerte – GSM Team";
       const logoUrl = `${new URL(req.url).origin}/favicon.ico`;
       const html = buildOfferEmail({
@@ -147,7 +158,7 @@ export async function POST(req: Request) {
         model:          data.model,
         color:          data.color,
         issue:          data.issue,
-        quality:        data.quality,
+        quality:        showQuality ? data.quality : undefined,
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
@@ -162,7 +173,7 @@ export async function POST(req: Request) {
         model: data.model,
         color: data.color,
         issue: data.issue,
-        quality: data.quality,
+        quality:        showQuality ? data.quality : undefined,
         price_text: data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
