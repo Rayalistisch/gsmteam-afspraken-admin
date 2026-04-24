@@ -143,6 +143,33 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
     y += klantH + 8;
   }
 
+  // ── Afgesproken datum ───────────────────────────────────
+  if (input.preferred_date || input.preferred_time) {
+    let afsprD: string | null = null;
+    if (input.preferred_date) {
+      try {
+        afsprD = new Date(input.preferred_date + "T00:00:00").toLocaleDateString("nl-NL", {
+          weekday: "long", day: "numeric", month: "long", year: "numeric",
+        });
+      } catch {
+        afsprD = input.preferred_date;
+      }
+    }
+    const afsprStr = [afsprD, input.preferred_time ? `om ${input.preferred_time}` : null]
+      .filter(Boolean).join(" ");
+    doc.setFillColor(235, 245, 255);
+    doc.roundedRect(margin, y, pageW - margin * 2, 18, 1.5, 1.5, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...MUTED);
+    doc.text("AFGESPROKEN DATUM", margin + 5, y + 6);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...BLUE);
+    doc.text(afsprStr, margin + 5, y + 13);
+    y += 26;
+  }
+
   // ── Reparaties tabel ────────────────────────────────────
   const showQualCol = !!(input.quality?.trim());
 

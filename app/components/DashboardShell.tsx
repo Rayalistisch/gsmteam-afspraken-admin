@@ -26,6 +26,22 @@ const navItems = [
     ),
   },
   {
+    href: "/planning",
+    label: "Planning",
+    exact: false,
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <line x1="8" y1="14" x2="8" y2="14" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="12" y1="14" x2="12" y2="14" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="16" y1="14" x2="16" y2="14" strokeWidth="3" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
     href: "/catalogus",
     label: "Catalogus",
     exact: false,
@@ -169,9 +185,62 @@ const dashStyles = `
 }
 
 
+.bottomNav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 56px;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  z-index: 100;
+  padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+}
+
+.bottomNavItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  text-decoration: none;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 0;
+  position: relative;
+  transition: color 0.12s;
+}
+
+.bottomNavItem svg { stroke: currentColor; }
+
+.bottomNavItemActive { color: #2563eb; }
+
+.bottomNavBadge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 20px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #EF4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .dashWrap { display: block; }
+  .dashContent { padding-bottom: 68px; }
+  .bottomNav { display: flex; }
 }
 `;
 
@@ -233,6 +302,27 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <div className="dashContent">
         {children}
       </div>
+
+      {/* Bottom navigation — alleen zichtbaar op mobiel */}
+      <nav className="bottomNav">
+        {navItems.map(({ href, label, icon, exact }) => {
+          const active = exact ? pathname === href : pathname.startsWith(href);
+          const showBadge = href === "/" && pendingCount !== null && pendingCount > 0;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`bottomNavItem${active ? " bottomNavItemActive" : ""}`}
+            >
+              {showBadge && (
+                <span className="bottomNavBadge">{pendingCount! > 99 ? "99+" : pendingCount}</span>
+              )}
+              {icon}
+              <span>{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

@@ -391,6 +391,19 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* ====== MOBILE FILTER TABS ====== */}
+      <div className="mobileFilterBar">
+        {filterConfig.map(({ key, shortLabel }) => (
+          <button
+            key={key}
+            className={cx("mobileFilterTab", filter === key && "mobileFilterTabActive")}
+            onClick={() => setFilter(key)}
+          >
+            {shortLabel}
+          </button>
+        ))}
+      </div>
+
       {/* ====== DESKTOP HEADER ====== */}
       <header className="topbar">
         <div className="topbarInner">
@@ -668,19 +681,6 @@ export default function AdminPage() {
         </section>
       </main>
 
-      {/* ====== BOTTOM NAV (mobile only) ====== */}
-      <nav className="bottomNav" aria-label="Navigatie">
-        {filterConfig.map(({ key, shortLabel, Icon }) => (
-          <button
-            key={key}
-            className={cx("bnItem", filter === key && "bnActive")}
-            onClick={() => setFilter(key)}
-          >
-            <Icon />
-            <span className="bnLabel">{shortLabel}</span>
-          </button>
-        ))}
-      </nav>
     </DashboardShell>
   );
 }
@@ -1312,46 +1312,36 @@ details[open] .chev{ transform: rotate(180deg); }
   font-weight: 500;
 }
 
-/* ========== BOTTOM NAV ========== */
-.bottomNav{
+/* ========== MOBILE FILTER TABS ========== */
+.mobileFilterBar{
   display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid rgba(0,0,0,0.06);
-  padding: 6px 8px;
-  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-  justify-content: space-around;
-  align-items: center;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 6px;
+  padding: 0 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
 }
-.bnItem{
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: none;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #94A3B8;
-  transition: all 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-  min-width: 64px;
-}
-.bnItem:active{ transform: scale(0.92); }
-.bnActive{
-  color: #3B82F6;
-}
-.bnLabel{
-  font-size: 10px;
+.mobileFilterBar::-webkit-scrollbar{ display: none; }
+.mobileFilterTab{
+  flex-shrink: 0;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #64748B;
+  padding: 7px 16px;
+  border-radius: 13px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobileFilterTabActive{
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #fff;
 }
 
 /* ========== RESPONSIVE: tablet ========== */
@@ -1370,7 +1360,7 @@ details[open] .chev{ transform: rotate(180deg); }
   .mobileHeader{ display: flex; }
   .mobileSearchBar{ display: block; }
   .topbar{ display: none; }
-  .bottomNav{ display: flex; }
+  .mobileFilterBar{ display: flex; }
 
   .content{
     padding: 12px 12px;
