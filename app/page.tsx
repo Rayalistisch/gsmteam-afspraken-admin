@@ -242,7 +242,7 @@ export default function AdminPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { setStatus("Fout bij versturen offerte."); setBusyId(null); return; }
-      setStatus(j.mail_sent ? "Offerte verstuurd — wacht op klant." : "Status bijgewerkt (geen mail verstuurd).");
+      setStatus(j.mail_sent ? "Offerte verstuurd — wacht op klant." : `Mail niet verstuurd: ${j.mail_error || j.stage || "onbekende fout"}`);
       setBusyId(null);
       load(true);
     } catch {
