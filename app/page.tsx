@@ -72,10 +72,11 @@ const IconSearch = () => (
 );
 
 const filterConfig = [
-  { key: "pending" as const, label: "Openstaand", shortLabel: "Openstaand", Icon: IconClock },
-  { key: "approved" as const, label: "Goedgekeurd", shortLabel: "Goedgekeurd", Icon: IconCheck },
-  { key: "rejected" as const, label: "Afgewezen", shortLabel: "Afgewezen", Icon: IconX },
-  { key: "all" as const, label: "Alles", shortLabel: "Alles", Icon: IconList },
+  { key: "pending" as const,            label: "Openstaand",    shortLabel: "Openstaand",    Icon: IconClock },
+  { key: "awaiting_approval" as const,  label: "Wacht op klant", shortLabel: "Wacht op klant", Icon: IconClock },
+  { key: "approved" as const,           label: "Goedgekeurd",   shortLabel: "Goedgekeurd",   Icon: IconCheck },
+  { key: "rejected" as const,           label: "Afgewezen",     shortLabel: "Afgewezen",     Icon: IconX },
+  { key: "all" as const,                label: "Alles",         shortLabel: "Alles",         Icon: IconList },
 ];
 
 const AVATAR_COLORS = ["#3B82F6","#8B5CF6","#EC4899","#F59E0B","#10B981","#EF4444","#6366F1","#0EA5E9"];
@@ -92,7 +93,7 @@ function getInitials(name: string) {
 
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [filter, setFilter] = useState<"pending" | "awaiting_approval" | "approved" | "rejected" | "all">("pending");
   const [status, setStatus] = useState("Laden…");
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -225,6 +226,27 @@ export default function AdminPage() {
     } catch (e) {
       console.error(e);
       setStatus("Netwerkfout bij afwijzen.");
+      setBusyId(null);
+    }
+  }
+
+  async function sendOffer(id: string) {
+    if (!confirm("Offerte versturen ter goedkeuring door de klant?")) return;
+    setBusyId(id);
+    setStatus("Offerte versturen…");
+    try {
+      const res = await fetch("/api/offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setStatus("Fout bij versturen offerte."); setBusyId(null); return; }
+      setStatus(j.mail_sent ? "Offerte verstuurd — wacht op klant." : "Status bijgewerkt (geen mail verstuurd).");
+      setBusyId(null);
+      load(true);
+    } catch {
+      setStatus("Netwerkfout bij versturen offerte.");
       setBusyId(null);
     }
   }
@@ -504,10 +526,12 @@ export default function AdminPage() {
 
               const statusBadge =
                 r.status === "approved"
-                  ? { cls: "badge badgeOk", label: "Goedgekeurd" }
+                  ? { cls: "badge badgeOk",      label: "Goedgekeurd" }
                   : r.status === "rejected"
-                  ? { cls: "badge badgeBad", label: "Afgewezen" }
-                  : { cls: "badge badgeWarn", label: "Openstaand" };
+                  ? { cls: "badge badgeBad",     label: "Afgewezen" }
+                  : r.status === "awaiting_approval"
+                  ? { cls: "badge badgeWaiting", label: "Wacht op klant" }
+                  : { cls: "badge badgeWarn",    label: "Openstaand" };
 
               const qualityBadge = r.quality === "Officieel"
                 ? { cls: "badge badgeQualOfficieel", label: "Officieel" }
@@ -598,12 +622,17 @@ export default function AdminPage() {
                           >
                             Bewerken
                           </button>
-                          {r.status === "pending" && (
+                          {(r.status === "pending" || r.status === "awaiting_approval") && (
                             <>
                               <span className="actDivider" />
                               <button className="btn btnDanger btnSm" onClick={(e) => { e.preventDefault(); reject(r.id); }} disabled={busyId === r.id}>
                                 {busyId === r.id ? "…" : "Afwijzen"}
                               </button>
+                              {r.status === "pending" && (
+                                <button className="btn btnSecondary btnSm" onClick={(e) => { e.preventDefault(); sendOffer(r.id); }} disabled={busyId === r.id}>
+                                  {busyId === r.id ? "…" : "Stuur Offerte"}
+                                </button>
+                              )}
                               <button className="btn btnPrimary btnSm" onClick={(e) => { e.preventDefault(); approve(r.id); }} disabled={busyId === r.id}>
                                 {busyId === r.id ? "…" : "Goedkeuren"}
                               </button>
@@ -1187,6 +1216,7 @@ details[open] .chev{ transform: rotate(180deg); }
 .badgeEdit{ background: #F5F3FF; color: #5B21B6; }
 .badgeQualOfficieel{ background: #EFF6FF; color: #1D4ED8; }
 .badgeQualCompatible{ background: #F0FDF4; color: #166534; }
+.badgeWaiting{ background: #FFF7ED; color: #92400E; }
 .metaTimeRight{ font-size: 12px; color: #94A3B8; white-space: nowrap; text-align: right; }
 
 /* ========== CHIPS ========== */
@@ -1242,6 +1272,9 @@ details[open] .chev{ transform: rotate(180deg); }
 
 .btnDanger{ background: #FEF2F2; color: #DC2626; }
 .btnDanger:hover{ background: #FEE2E2; color: #B91C1C; }
+
+.btnSecondary{ background: #F1F5F9; color: #334155; border: 1px solid #E2E8F0; }
+.btnSecondary:hover{ background: #E2E8F0; color: #0F172A; }
 
 /* ========== CARD BODY ========== */
 .cardBody{

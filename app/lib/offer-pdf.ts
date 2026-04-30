@@ -418,3 +418,143 @@ export function buildOfferEmail(data: {
 </table>
   `;
 }
+
+export function buildOfferQuoteEmail(data: OfferInput & {
+  acceptUrl: string;
+  rejectUrl: string;
+}): string {
+  const name = data.customer_name || "klant";
+
+  const logoHtml = `<span style="font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;color:#1e3a5f">GSM Team</span>`;
+
+  const toestel = [data.brand, data.model, data.color].filter(Boolean).join(" ") || null;
+  const voorkeur = fmtEmailDate(data.preferred_date, data.preferred_time) || null;
+
+  const detailRows = [
+    emailDetailRow("Merk",      data.brand),
+    emailDetailRow("Model",     data.model),
+    emailDetailRow("Kleur",     data.color),
+    emailDetailRow("Reparatie", data.issue),
+    emailDetailRow("Kwaliteit", data.quality),
+    emailDetailRow("Prijs",     data.price_text),
+    emailDetailRow("Voorkeur",  voorkeur),
+  ].join("");
+
+  return `
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed;background-color:#f9f9f9">
+  <tbody>
+    <tr>
+      <td style="padding-right:10px;padding-left:10px" align="center" valign="top">
+
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px">
+          <tbody>
+            <tr>
+              <td align="center" valign="top">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#fff;border-color:#e5e5e5;border-style:solid;border-width:0 1px 1px 1px">
+                  <tbody>
+                    <tr>
+                      <td style="background-color:#f59e0b;font-size:1px;line-height:3px" height="3">&nbsp;</td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top:40px;padding-bottom:16px" align="center" valign="middle">
+                        ${logoHtml}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-bottom:8px;padding-left:20px;padding-right:20px" align="center" valign="top">
+                        <h2 style="color:#0f172a;font-family:Helvetica,Arial,sans-serif;font-size:26px;font-weight:600;line-height:34px;text-align:center;padding:0;margin:0">Offerte ter goedkeuring 📋</h2>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-bottom:20px;padding-left:20px;padding-right:20px" align="center" valign="top">
+                        <h4 style="color:#64748b;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">Hallo ${name}</h4>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-left:40px;padding-right:40px" align="center" valign="top">
+                        <p style="color:#475569;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">
+                          Hierbij ontvangt u onze offerte voor de reparatie van uw ${toestel ? `<strong>${toestel}</strong>` : "apparaat"}.<br>
+                          In de bijlage vindt u de offerte als PDF.<br>
+                          Bevestig hieronder of u akkoord gaat.
+                        </p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:24px 60px 0" align="center" valign="top">
+                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top:1px solid #e2e8f0">
+                          <tbody>
+                            ${detailRows}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    <!-- CTA knoppen -->
+                    <tr>
+                      <td style="padding:28px 40px 8px" align="center" valign="top">
+                        <table border="0" cellpadding="0" cellspacing="0">
+                          <tbody>
+                            <tr>
+                              <td style="padding:0 8px 0 0">
+                                <a href="${data.acceptUrl}" style="display:inline-block;padding:14px 32px;background:#22c55e;color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none;line-height:1">✓&nbsp;&nbsp;Ja, akkoord</a>
+                              </td>
+                              <td style="padding:0 0 0 8px">
+                                <a href="${data.rejectUrl}" style="display:inline-block;padding:14px 32px;background:#f1f5f9;color:#64748b;font-family:Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;border-radius:10px;text-decoration:none;line-height:1">Nee, afwijzen</a>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="font-size:1px;line-height:1px" height="28">&nbsp;</td>
+                    </tr>
+                    <tr>
+                      <td style="padding-bottom:40px;padding-left:60px;padding-right:60px" align="center" valign="middle">
+                        <p style="color:#475569;font-family:Helvetica,Arial,sans-serif;font-size:14px;font-weight:400;line-height:22px;text-align:center;padding:0;margin:0">
+                          Met vriendelijke groet,<br>
+                          <strong style="color:#0f172a">GSM Team</strong>
+                        </p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                  <tbody>
+                    <tr><td style="font-size:1px;line-height:1px" height="30">&nbsp;</td></tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px">
+          <tbody>
+            <tr>
+              <td align="center" valign="top">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                  <tbody>
+                    <tr>
+                      <td style="padding:10px" align="center" valign="top">
+                        <p style="color:#bbb;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;line-height:20px;text-align:center;padding:0;margin:0">© GSM Team</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:0 10px 20px" align="center" valign="top">
+                        <p style="color:#bbb;font-family:Helvetica,Arial,sans-serif;font-size:12px;font-weight:400;line-height:20px;text-align:center;padding:0;margin:0">Referentie: ${data.id ?? "-"}</p>
+                      </td>
+                    </tr>
+                    <tr><td style="font-size:1px;line-height:1px" height="30">&nbsp;</td></tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </td>
+    </tr>
+  </tbody>
+</table>
+  `;
+}

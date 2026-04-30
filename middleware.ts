@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes die Shopify cross-origin aanroept — nooit blokkeren
-const PUBLIC_API = ["/api/create-request", "/api/catalog"];
+const PUBLIC_API = ["/api/create-request", "/api/catalog", "/api/offer-confirm"];
 
 export function middleware(req: NextRequest) {
   // CORS-preflight altijd doorlaten (anders blokkeert browser de POST)
@@ -22,5 +22,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|api/auth/pin|_next|favicon.ico).*)"],
+  matcher: ["/((?!login|offer-confirm|api/auth/pin|_next|favicon.ico).*)"],
 };
