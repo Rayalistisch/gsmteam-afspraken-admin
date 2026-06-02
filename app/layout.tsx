@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { Suspense } from "react";
 import AppBridgeInit from "./components/AppBridgeInit";
 import "./globals.css";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
@@ -38,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="nl">
       <body
-        className={`${poppins.variable} antialiased`}
+        className={`${plusJakartaSans.variable} antialiased`}
       >
         <Suspense fallback={null}>
           <AppBridgeInit />

@@ -45,7 +45,11 @@ export async function POST(req: Request) {
     }
 
     // ✅ Whitelist: alleen deze velden mogen aangepast worden vanuit admin UI
-    const allowed = new Set(["price_text", "preferred_date", "preferred_time", "notes"]);
+    const allowed = new Set([
+      "customer_name", "customer_email", "customer_phone",
+      "brand", "model", "color", "issue", "quality",
+      "price_text", "preferred_date", "preferred_time", "notes",
+    ]);
 
     const cleanPatch: Record<string, any> = {};
     for (const [k, v] of Object.entries(patch)) {

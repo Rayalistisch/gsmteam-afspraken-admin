@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     let q = sb
       .from("repair_requests")
       .select(
-        "id, created_at, customer_name, customer_email, customer_phone, brand, model, color, issue, price_text, preferred_date, preferred_time, status, condition, quality, warranty, notes"
+        "id, created_at, customer_name, customer_email, customer_phone, brand, model, color, issue, price_text, preferred_date, preferred_time, status, condition, quality, warranty, notes, reminder_sent_at"
       )
       .order("created_at", { ascending: false });
 
