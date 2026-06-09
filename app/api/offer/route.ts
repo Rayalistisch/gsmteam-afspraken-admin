@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       .from("repair_requests")
       .update({ status: "awaiting_approval" })
       .eq("id", id)
-      .select("id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time")
+      .select("id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time, repairs")
       .single();
 
     if (error) return NextResponse.json({ error: safe(error.message) }, { status: 500 });
@@ -117,6 +117,7 @@ export async function POST(req: Request) {
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
         acceptUrl,
         rejectUrl,
       });
@@ -134,6 +135,7 @@ export async function POST(req: Request) {
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
       });
 
       const toAddress = MAIL_DEBUG_TO || customer_email;

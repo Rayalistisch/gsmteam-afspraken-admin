@@ -50,9 +50,14 @@ export async function POST(req: Request) {
       "brand", "model", "color", "issue", "quality",
       "price_text", "preferred_date", "preferred_time", "notes",
     ]);
+    const jsonAllowed = new Set(["repairs"]);
 
     const cleanPatch: Record<string, any> = {};
     for (const [k, v] of Object.entries(patch)) {
+      if (jsonAllowed.has(k)) {
+        cleanPatch[k] = Array.isArray(v) ? v : [];
+        continue;
+      }
       if (!allowed.has(k)) continue;
 
       // normaliseer naar string (of null)

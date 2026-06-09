@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       .update({ status: "approved" })
       .eq("id", id)
       .select(
-        "id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time"
+        "id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time, repairs"
       )
       .single();
 
@@ -162,6 +162,7 @@ export async function POST(req: Request) {
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
       });
 
       const pdf = await buildOfferPdf({
@@ -177,6 +178,7 @@ export async function POST(req: Request) {
         price_text: data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
       });
 
       const toAddress = MAIL_DEBUG_TO || customer_email;

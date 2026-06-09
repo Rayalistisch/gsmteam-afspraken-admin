@@ -9,6 +9,12 @@ const DARK:   [number, number, number] = [30,  35,  45];
 const MUTED:  [number, number, number] = [110, 120, 135];
 const LINE:   [number, number, number] = [210, 213, 216];
 
+export type RepairItem = {
+  issue: string;
+  quality?: string;
+  price?: string;
+};
+
 export type OfferInput = {
   id: string;
   customer_name?: string;
@@ -22,6 +28,7 @@ export type OfferInput = {
   price_text?: string;
   preferred_date?: string;
   preferred_time?: string;
+  repairs?: RepairItem[];
 };
 
 export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
@@ -171,7 +178,18 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
   }
 
   // ── Reparaties tabel ────────────────────────────────────
-  const showQualCol = !!(input.quality?.trim());
+  const extraRepairs = input.repairs || [];
+
+  const allRows = [
+    { issue: input.issue || "Reparatie", quality: input.quality || "", price: input.price_text || "Op aanvraag" },
+    ...extraRepairs.map(r => ({
+      issue: r.issue,
+      quality: r.quality || "",
+      price: r.price ? `€${r.price}` : "Op aanvraag",
+    })),
+  ];
+
+  const showQualCol = allRows.some(r => r.quality.trim());
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
@@ -179,15 +197,15 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
   doc.text("REPARATIES", margin, y);
   y += 4;
 
-  const repairRow = showQualCol
-    ? [input.issue || "Reparatie", input.quality!, input.price_text || "Op aanvraag"]
-    : [input.issue || "Reparatie", input.price_text || "Op aanvraag"];
+  const tableBody = allRows.map(r =>
+    showQualCol ? [r.issue, r.quality, r.price] : [r.issue, r.price]
+  );
 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     head: [showQualCol ? ["Omschrijving", "Kwaliteit", "Prijs"] : ["Omschrijving", "Prijs"]],
-    body: [repairRow],
+    body: tableBody,
     headStyles: {
       fillColor: BLUE,
       textColor: 255,
@@ -211,6 +229,21 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
   y = (doc as any).lastAutoTable.finalY + 14;
 
   // ── Totaal ──────────────────────────────────────────────
+  let totalText = input.price_text || "Op aanvraag";
+  if (extraRepairs.length > 0) {
+    const parsePriceNum = (s?: string) => {
+      if (!s) return null;
+      const n = parseFloat(s.replace(/[€\s]/g, "").replace(",", "."));
+      return isNaN(n) ? null : n;
+    };
+    const mainNum = parsePriceNum(input.price_text);
+    const extraNums = extraRepairs.map(r => parsePriceNum(r.price)).filter((n): n is number => n !== null);
+    const sum = (mainNum ?? 0) + extraNums.reduce((a, b) => a + b, 0);
+    if (mainNum !== null || extraNums.length > 0) {
+      totalText = `€${sum % 1 === 0 ? sum : sum.toFixed(2)}`;
+    }
+  }
+
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.3);
   doc.line(margin, y, pageW - margin, y);
@@ -222,7 +255,7 @@ export async function buildOfferPdf(input: OfferInput): Promise<Buffer> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...BLUE);
-  doc.text(input.price_text || "Op aanvraag", pageW - margin, y, { align: "right" });
+  doc.text(totalText, pageW - margin, y, { align: "right" });
 
   // ── Footer ───────────────────────────────────────────────
   const footerY = pageH - 12;
@@ -287,6 +320,7 @@ export function buildOfferEmail(data: {
   price_text?: string;
   preferred_date?: string;
   preferred_time?: string;
+  repairs?: RepairItem[];
 }): string {
   const name = data.customer_name || "klant";
 
@@ -294,17 +328,44 @@ export function buildOfferEmail(data: {
     ? `<img src="${data.logoUrl}" alt="GSM Team" width="48" height="48" border="0" style="display:block;width:48px;height:48px;border-radius:10px;object-fit:cover">`
     : `<span style="font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;color:#1e3a5f">GSM Team</span>`;
 
-  const toestel = [data.brand, data.model, data.color].filter(Boolean).join(" ") || null;
   const voorkeur = fmtEmailDate(data.preferred_date, data.preferred_time) || null;
 
+  const extraRepairs = data.repairs || [];
+  let repairRows: string;
+  if (extraRepairs.length > 0) {
+    const allRepairLines = [
+      [data.issue, data.quality, data.price_text].filter(Boolean).join(" · "),
+      ...extraRepairs.map(r => [r.issue, r.quality, r.price ? `€${r.price}` : ""].filter(Boolean).join(" · ")),
+    ].join("<br>");
+    const parsePriceNum = (s?: string) => {
+      if (!s) return null;
+      const n = parseFloat(s.replace(/[€\s]/g, "").replace(",", "."));
+      return isNaN(n) ? null : n;
+    };
+    const mainNum = parsePriceNum(data.price_text);
+    const extraNums = extraRepairs.map(r => parsePriceNum(r.price)).filter((n): n is number => n !== null);
+    const sum = (mainNum ?? 0) + extraNums.reduce((a, b) => a + b, 0);
+    const totalText = (mainNum !== null || extraNums.length > 0)
+      ? `€${sum % 1 === 0 ? sum : sum.toFixed(2)}`
+      : (data.price_text || "Op aanvraag");
+    repairRows = [
+      emailDetailRow("Reparaties", allRepairLines),
+      emailDetailRow("Totaal",     totalText),
+    ].join("");
+  } else {
+    repairRows = [
+      emailDetailRow("Reparatie", data.issue),
+      emailDetailRow("Kwaliteit", data.quality),
+      emailDetailRow("Prijs",     data.price_text),
+    ].join("");
+  }
+
   const detailRows = [
-    emailDetailRow("Merk",      data.brand),
-    emailDetailRow("Model",     data.model),
-    emailDetailRow("Kleur",     data.color),
-    emailDetailRow("Reparatie", data.issue),
-    emailDetailRow("Kwaliteit", data.quality),
-    emailDetailRow("Prijs",     data.price_text),
-    emailDetailRow("Voorkeur",  voorkeur),
+    emailDetailRow("Merk",     data.brand),
+    emailDetailRow("Model",    data.model),
+    emailDetailRow("Kleur",    data.color),
+    repairRows,
+    emailDetailRow("Voorkeur", voorkeur),
   ].join("");
 
   return `
@@ -430,14 +491,42 @@ export function buildOfferQuoteEmail(data: OfferInput & {
   const toestel = [data.brand, data.model, data.color].filter(Boolean).join(" ") || null;
   const voorkeur = fmtEmailDate(data.preferred_date, data.preferred_time) || null;
 
+  const extraRepairs = data.repairs || [];
+  let repairRowsQ: string;
+  if (extraRepairs.length > 0) {
+    const allRepairLines = [
+      [data.issue, data.quality, data.price_text].filter(Boolean).join(" · "),
+      ...extraRepairs.map(r => [r.issue, r.quality, r.price ? `€${r.price}` : ""].filter(Boolean).join(" · ")),
+    ].join("<br>");
+    const parsePriceNum = (s?: string) => {
+      if (!s) return null;
+      const n = parseFloat(s.replace(/[€\s]/g, "").replace(",", "."));
+      return isNaN(n) ? null : n;
+    };
+    const mainNum = parsePriceNum(data.price_text);
+    const extraNums = extraRepairs.map(r => parsePriceNum(r.price)).filter((n): n is number => n !== null);
+    const sum = (mainNum ?? 0) + extraNums.reduce((a, b) => a + b, 0);
+    const totalText = (mainNum !== null || extraNums.length > 0)
+      ? `€${sum % 1 === 0 ? sum : sum.toFixed(2)}`
+      : (data.price_text || "Op aanvraag");
+    repairRowsQ = [
+      emailDetailRow("Reparaties", allRepairLines),
+      emailDetailRow("Totaal",     totalText),
+    ].join("");
+  } else {
+    repairRowsQ = [
+      emailDetailRow("Reparatie", data.issue),
+      emailDetailRow("Kwaliteit", data.quality),
+      emailDetailRow("Prijs",     data.price_text),
+    ].join("");
+  }
+
   const detailRows = [
-    emailDetailRow("Merk",      data.brand),
-    emailDetailRow("Model",     data.model),
-    emailDetailRow("Kleur",     data.color),
-    emailDetailRow("Reparatie", data.issue),
-    emailDetailRow("Kwaliteit", data.quality),
-    emailDetailRow("Prijs",     data.price_text),
-    emailDetailRow("Voorkeur",  voorkeur),
+    emailDetailRow("Merk",     data.brand),
+    emailDetailRow("Model",    data.model),
+    emailDetailRow("Kleur",    data.color),
+    repairRowsQ,
+    emailDetailRow("Voorkeur", voorkeur),
   ].join("");
 
   return `

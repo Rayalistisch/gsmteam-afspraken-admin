@@ -71,7 +71,7 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("repair_requests")
-    .select("id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time")
+    .select("id, status, customer_name, customer_email, customer_phone, brand, model, color, issue, quality, price_text, preferred_date, preferred_time, repairs")
     .eq("id", id)
     .single();
 
@@ -122,6 +122,7 @@ export async function GET(req: Request) {
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
       });
 
       const pdf = await buildOfferPdf({
@@ -137,6 +138,7 @@ export async function GET(req: Request) {
         price_text:     data.price_text,
         preferred_date: data.preferred_date,
         preferred_time: data.preferred_time,
+        repairs:        data.repairs || [],
       });
 
       const toAddress = MAIL_DEBUG_TO || data.customer_email;

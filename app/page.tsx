@@ -80,6 +80,12 @@ const filterConfig = [
   { key: "all"               as const, label: "Alles" },
 ];
 
+type RepairItem = {
+  issue: string;
+  quality: string;
+  price: string;
+};
+
 type Draft = {
   customer_name: string;
   customer_email: string;
@@ -94,13 +100,14 @@ type Draft = {
   preferred_time: string;
   notes: string;
   save_to_catalog: boolean;
+  repairs: RepairItem[];
 };
 
 const emptyDraft: Draft = {
   customer_name: "", customer_email: "", customer_phone: "",
   brand: "", model: "", color: "", issue: "", quality: "",
   price_text: "", preferred_date: "", preferred_time: "",
-  notes: "", save_to_catalog: false,
+  notes: "", save_to_catalog: false, repairs: [],
 };
 
 export default function AdminPage() {
@@ -112,6 +119,9 @@ export default function AdminPage() {
   const [busyId, setBusyId]         = useState<string | null>(null);
   const [editId, setEditId]         = useState<string | null>(null);
   const [draft, setDraft]           = useState<Draft>(emptyDraft);
+  const [addingRepair, setAddingRepair] = useState(false);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [newRepair, setNewRepair]   = useState<RepairItem>({ issue: "", quality: "Compatible", price: "" });
 
   const drawerOpen = editId !== null;
   const editingRow = rows.find(r => r.id === editId);
@@ -216,12 +226,19 @@ export default function AdminPage() {
       preferred_time: r.preferred_time || "",
       notes:          r.notes          || "",
       save_to_catalog: false,
+      repairs: Array.isArray(r.repairs) ? r.repairs : [],
     });
+    setAddingRepair(false);
+    setCatalogItems([]);
+    setNewRepair({ issue: "", quality: "Compatible", price: "" });
   }
 
   function cancelEdit() {
     setEditId(null);
     setDraft(emptyDraft);
+    setAddingRepair(false);
+    setCatalogItems([]);
+    setNewRepair({ issue: "", quality: "Compatible", price: "" });
   }
 
   async function saveEdit(id: string) {
@@ -267,6 +284,34 @@ export default function AdminPage() {
       cancelEdit();
       load(true);
     } catch { setStatusMsg("Netwerkfout bij opslaan."); setBusyId(null); }
+  }
+
+  async function saveAndSendOffer(id: string) {
+    if (!confirm("Wijzigingen opslaan en offerte versturen naar de klant?")) return;
+    setBusyId(id);
+    setStatusMsg("Opslaan…");
+    try {
+      const { save_to_catalog, ...patch } = draft;
+      const saveRes = await fetch("/api/update-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, patch }),
+      });
+      const saveJ = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok || !saveJ?.ok) { setStatusMsg("Fout bij opslaan."); setBusyId(null); return; }
+
+      setStatusMsg("Offerte versturen…");
+      const offerRes = await fetch("/api/offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const offerJ = await offerRes.json().catch(() => ({}));
+      setStatusMsg(offerJ.mail_sent ? "Offerte verstuurd." : `Mail niet verstuurd: ${offerJ.mail_error || offerJ.stage || "onbekende fout"}`);
+      cancelEdit();
+      load(true);
+    } catch { setStatusMsg("Netwerkfout."); }
+    setBusyId(null);
   }
 
   useEffect(() => {
@@ -455,11 +500,11 @@ export default function AdminPage() {
 
                   {(r.status === "pending" || r.status === "awaiting_approval") && (
                     <>
-                      <button className="p-btn p-btn-danger" onClick={() => reject(r.id)} disabled={isBusy}>
-                        {I.x}{isBusy ? "…" : "Afwijzen"}
+                      <button className="p-btn p-btn-danger" title="Afwijzen" onClick={() => reject(r.id)} disabled={isBusy}>
+                        {I.x}<span className="p-btn-label">{isBusy ? "…" : "Afwijzen"}</span>
                       </button>
-                      <button className="p-btn p-btn-primary" onClick={() => approve(r.id)} disabled={isBusy}>
-                        {I.check}{isBusy ? "…" : "Goedkeuren"}
+                      <button className="p-btn p-btn-primary" title="Goedkeuren" onClick={() => approve(r.id)} disabled={isBusy}>
+                        {I.check}<span className="p-btn-label">{isBusy ? "…" : "Goedkeuren"}</span>
                       </button>
                     </>
                   )}
@@ -586,6 +631,133 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* Extra reparaties */}
+              <div className="p-formsection">
+                <div className="p-sectiontitle">Extra reparaties</div>
+
+                {draft.repairs.length > 0 && (
+                  <div className="p-repair-list">
+                    {draft.repairs.map((r, i) => (
+                      <div key={i} className="p-repair-item">
+                        <div className="p-repair-info">
+                          <span className="p-repair-issue">{r.issue}</span>
+                          {r.quality && <span className="p-badge-official" style={{ marginLeft: 6 }}>{r.quality}</span>}
+                        </div>
+                        <div className="p-repair-right">
+                          {r.price && <span className="p-price" style={{ fontSize: 13 }}>€{r.price}</span>}
+                          <button
+                            className="p-iconbtn"
+                            title="Verwijder"
+                            onClick={() => setDraft(d => ({ ...d, repairs: d.repairs.filter((_, j) => j !== i) }))}
+                          >
+                            {I.x}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {addingRepair ? (
+                  <div className="p-repair-adder">
+                    {catalogItems.length > 0 && (
+                      <div className="p-field">
+                        <label>Kies uit catalogus</label>
+                        <select
+                          className="p-input"
+                          value={newRepair.issue}
+                          onChange={e => {
+                            const found = catalogItems.find(c => c.repair_type === e.target.value);
+                            if (found) {
+                              setNewRepair(nr => ({
+                                ...nr,
+                                issue: found.repair_type,
+                                price: found.price != null ? String(found.price) : nr.price,
+                                quality: found.show_quality ? nr.quality : "",
+                              }));
+                            } else {
+                              setNewRepair(nr => ({ ...nr, issue: e.target.value }));
+                            }
+                          }}
+                        >
+                          <option value="">— Kies reparatie —</option>
+                          {catalogItems.map(c => (
+                            <option key={c.id} value={c.repair_type}>
+                              {c.repair_type}{c.price != null ? ` – €${c.price}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="p-fieldrow">
+                      <div className="p-field">
+                        <label>Reparatietype</label>
+                        <input
+                          className="p-input"
+                          value={newRepair.issue}
+                          onChange={e => setNewRepair(nr => ({ ...nr, issue: e.target.value }))}
+                          placeholder="bijv. Batterij"
+                        />
+                      </div>
+                      <div className="p-field">
+                        <label>Prijs</label>
+                        <div className="p-inputwrap">
+                          <span className="p-prefix">€</span>
+                          <input
+                            className="p-input p-input-prefixed"
+                            value={newRepair.price}
+                            onChange={e => setNewRepair(nr => ({ ...nr, price: e.target.value }))}
+                            placeholder="bijv. 45"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-repair-adder-btns">
+                      <button
+                        className="p-btn p-btn-ghost"
+                        onClick={() => { setAddingRepair(false); setNewRepair({ issue: "", quality: "Compatible", price: "" }); }}
+                      >
+                        Annuleren
+                      </button>
+                      <button
+                        className="p-btn p-btn-primary"
+                        disabled={!newRepair.issue.trim()}
+                        onClick={() => {
+                          if (!newRepair.issue.trim()) return;
+                          setDraft(d => ({ ...d, repairs: [...d.repairs, { issue: newRepair.issue.trim(), quality: newRepair.quality, price: newRepair.price.trim() }] }));
+                          setAddingRepair(false);
+                          setNewRepair({ issue: "", quality: "Compatible", price: "" });
+                        }}
+                      >
+                        {I.check}Toevoegen
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="p-btn p-btn-ghost p-repair-add-btn"
+                    onClick={async () => {
+                      setAddingRepair(true);
+                      if (draft.brand && draft.model) {
+                        try {
+                          const res = await fetch(`/api/catalog?brand=${encodeURIComponent(draft.brand)}&model=${encodeURIComponent(draft.model)}`);
+                          if (res.ok) {
+                            const items: any[] = await res.json();
+                            const colorItems = draft.color ? items.filter(c => c.color?.toLowerCase() === draft.color.toLowerCase()) : items;
+                            const source = colorItems.length > 0 ? colorItems : items;
+                            const seen = new Set<string>();
+                            const unique = source.filter(c => { if (seen.has(c.repair_type)) return false; seen.add(c.repair_type); return true; });
+                            setCatalogItems(unique);
+                          }
+                        } catch { /* toon handmatig formulier */ }
+                      }
+                    }}
+                  >
+                    + Voeg reparatie toe
+                  </button>
+                )}
+              </div>
+
               {/* Afspraak & prijs */}
               <div className="p-formsection">
                 <div className="p-sectiontitle">Afspraak &amp; prijs</div>
@@ -642,6 +814,16 @@ export default function AdminPage() {
                 <button className="p-btn p-btn-ghost p-btn-lg" onClick={cancelEdit}>
                   Annuleren
                 </button>
+                {editingRow.status === "pending" && (
+                  <button
+                    className="p-btn p-btn-offer p-btn-lg"
+                    onClick={() => saveAndSendOffer(editingRow.id)}
+                    disabled={busyId === editId}
+                    title="Opslaan en offerte versturen naar klant"
+                  >
+                    {I.mail}{busyId === editId ? "Bezig…" : "Stuur Offerte"}
+                  </button>
+                )}
                 <button
                   className="p-btn p-btn-primary p-btn-lg"
                   onClick={() => saveEdit(editingRow.id)}
@@ -907,7 +1089,7 @@ const pageStyles = `
 .p-thead,
 .p-row {
   display: grid;
-  grid-template-columns: 2.3fr 1.7fr 1.6fr .95fr .8fr auto;
+  grid-template-columns: 2.3fr 1.7fr 1.6fr .95fr .8fr 340px;
   align-items: center;
   column-gap: 18px;
 }
@@ -1051,6 +1233,8 @@ const pageStyles = `
 .p-btn-primary:not(:disabled):hover { background: var(--p-blue-600); }
 .p-btn-ghost { background: var(--p-bg); border-color: var(--p-line-2); color: var(--p-ink-2); }
 .p-btn-ghost:not(:disabled):hover { background: var(--p-bg-soft); }
+.p-btn-offer { background: var(--p-amber-bg); color: var(--p-amber-tx); border-color: #F5C77E; }
+.p-btn-offer:not(:disabled):hover { background: #FDEACB; }
 .p-btn-danger { background: transparent; color: var(--p-red); border-color: transparent; }
 .p-btn-danger:not(:disabled):hover { background: var(--p-red-50); }
 .p-btn-lg { padding: 11px 20px; font-size: 14px; border-radius: 10px; }
@@ -1282,6 +1466,68 @@ const pageStyles = `
 .p-dellink:disabled { opacity: .45; cursor: not-allowed; }
 .p-dellink svg { width: 15px; height: 15px; }
 
+/* ── Extra reparaties ── */
+.p-repair-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.p-repair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border: 1px solid var(--p-line-2);
+  border-radius: 10px;
+  background: var(--p-bg-soft);
+  gap: 10px;
+}
+.p-repair-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.p-repair-issue {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--p-ink);
+  font-family: var(--p-font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-repair-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.p-repair-adder {
+  border: 1px solid var(--p-blue);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--p-blue-50);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.p-repair-adder-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.p-repair-add-btn {
+  width: 100%;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--p-blue);
+  font-size: 13.5px;
+}
+.p-repair-add-btn:hover { background: var(--p-blue-50); border-style: solid; }
+
 /* ── Desktop only / mobile meta ── */
 .p-mobilemeta { display: none; }
 
@@ -1289,10 +1535,22 @@ const pageStyles = `
 @media (max-width: 1100px) {
   .p-thead,
   .p-row {
-    grid-template-columns: 2fr 1.5fr 1.5fr 1fr auto;
+    grid-template-columns: 2fr 1.5fr 1.5fr 1fr 340px;
   }
   .p-thead span:nth-child(5),
-  .p-row .p-deskonly:nth-of-type(3) { display: none; }
+  .p-row > div:nth-child(5) { display: none; }
+}
+
+/* ── Responsive: smal tablet ── */
+@media (max-width: 900px) {
+  .p-thead,
+  .p-row {
+    grid-template-columns: 2fr 1.5fr 1fr 180px;
+  }
+  .p-thead span:nth-child(3),
+  .p-row > div:nth-child(3) { display: none; }
+  .p-btn-label { display: none; }
+  .p-btn { padding: 8px; gap: 0; }
 }
 
 /* ── Responsive: mobile ── */
