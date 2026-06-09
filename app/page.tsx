@@ -1260,7 +1260,7 @@ const pageStyles = `
 .p-btn-offer:not(:disabled):hover { background: #FDEACB; }
 .p-btn-danger { background: transparent; color: var(--p-red); border-color: transparent; }
 .p-btn-danger:not(:disabled):hover { background: var(--p-red-50); }
-.p-btn-lg { padding: 11px 20px; font-size: 14px; border-radius: 10px; }
+.p-btn-lg { padding: 8px 14px; font-size: 13px; border-radius: 9px; }
 
 /* ── Empty state ── */
 .p-empty {
