@@ -418,6 +418,16 @@ export default function AdminPage() {
             const device   = [r.brand, r.model].filter(Boolean).join(" ");
             const dateStr  = fmtDate(r.preferred_date);
             const isBusy   = busyId === r.id;
+            const extras   = Array.isArray(r.repairs) ? r.repairs : [];
+            const displayPrice = (() => {
+              if (extras.length === 0) return r.price_text || null;
+              const parseNum = (s: string) => { const n = parseFloat((s || "").replace(/[€\s]/g, "").replace(",", ".")); return isNaN(n) ? null : n; };
+              const main = parseNum(r.price_text);
+              const extraNums = extras.map((x: any) => parseNum(x.price)).filter((n: any): n is number => n !== null);
+              if (main === null && extraNums.length === 0) return r.price_text || null;
+              const sum = (main ?? 0) + extraNums.reduce((a: number, b: number) => a + b, 0);
+              return `€${sum % 1 === 0 ? sum : sum.toFixed(2)}`;
+            })();
 
             return (
               <div className="p-row" key={r.id}>
@@ -458,8 +468,8 @@ export default function AdminPage() {
 
                 {/* PRIJS */}
                 <div className="p-right p-deskonly">
-                  {r.price_text
-                    ? <span className="p-price">{r.price_text}</span>
+                  {displayPrice
+                    ? <span className="p-price">{displayPrice}</span>
                     : <span className="p-muted">–</span>}
                 </div>
 
@@ -469,7 +479,7 @@ export default function AdminPage() {
                   {r.color && <span className="p-metasep">{r.color}</span>}
                   {r.issue && <span className="p-metasep">{r.issue}</span>}
                   {r.quality === "Officieel" && <span className="p-badge-official" style={{ fontSize: 11, padding: "2px 7px" }}>Officieel</span>}
-                  {r.price_text && <span className="p-metaprice">{r.price_text}</span>}
+                  {displayPrice && <span className="p-metaprice">{displayPrice}</span>}
                   {dateStr && <span className="p-metasep p-metadate">{dateStr}{r.preferred_time ? ` ${r.preferred_time}` : ""}</span>}
                 </div>
 
@@ -786,6 +796,19 @@ export default function AdminPage() {
                       onChange={e => setDraft(d => ({ ...d, save_to_catalog: e.target.checked }))} />
                     Ook opslaan in catalogus
                   </label>
+                  {draft.repairs.length > 0 && (() => {
+                    const parseNum = (s: string) => { const n = parseFloat(s.replace(/[€\s]/g, "").replace(",", ".")); return isNaN(n) ? null : n; };
+                    const main = parseNum(draft.price_text);
+                    const extras = draft.repairs.map(r => parseNum(r.price)).filter((n): n is number => n !== null);
+                    if (main === null && extras.length === 0) return null;
+                    const sum = (main ?? 0) + extras.reduce((a, b) => a + b, 0);
+                    return (
+                      <div className="p-price-total">
+                        <span>Totaal</span>
+                        <span className="p-price-total-val">€{sum % 1 === 0 ? sum : sum.toFixed(2)}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1527,6 +1550,24 @@ const pageStyles = `
   font-size: 13.5px;
 }
 .p-repair-add-btn:hover { background: var(--p-blue-50); border-style: solid; }
+.p-price-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 9px 13px;
+  background: var(--p-blue-50);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--p-ink-2);
+  font-family: var(--p-font);
+}
+.p-price-total-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--p-blue);
+}
 
 /* ── Desktop only / mobile meta ── */
 .p-mobilemeta { display: none; }
