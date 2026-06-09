@@ -620,23 +620,40 @@ export default function AdminPage() {
                   <input className="p-input" value={draft.issue}
                     onChange={e => setDraft(d => ({ ...d, issue: e.target.value }))} />
                 </div>
-                <div
-                  className="p-switchrow"
-                  onClick={() => setDraft(d => ({ ...d, quality: d.quality === "Officieel" ? "Compatible" : "Officieel" }))}
-                  role="switch"
-                  aria-checked={draft.quality === "Officieel"}
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setDraft(d => ({ ...d, quality: d.quality === "Officieel" ? "Compatible" : "Officieel" })); } }}
-                >
-                  <div>
-                    <div className="p-switchtxt">Officieel onderdeel</div>
-                    <div className="p-switchsub">Origineel onderdeel van fabrikant</div>
-                  </div>
+                <div className="p-fieldrow" style={{ alignItems: "flex-end" }}>
                   <div
-                    className="p-switch"
-                    style={{ background: draft.quality === "Officieel" ? "var(--p-blue)" : "#D4D8E0" }}
+                    className="p-switchrow"
+                    style={{ flex: 1 }}
+                    onClick={() => setDraft(d => ({ ...d, quality: d.quality === "Officieel" ? "Compatible" : "Officieel" }))}
+                    role="switch"
+                    aria-checked={draft.quality === "Officieel"}
+                    tabIndex={0}
+                    onKeyDown={e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setDraft(d => ({ ...d, quality: d.quality === "Officieel" ? "Compatible" : "Officieel" })); } }}
                   >
-                    <span className="p-switch-thumb" style={{ left: draft.quality === "Officieel" ? 21 : 3 }} />
+                    <div>
+                      <div className="p-switchtxt">Officieel onderdeel</div>
+                      <div className="p-switchsub">Origineel onderdeel</div>
+                    </div>
+                    <div
+                      className="p-switch"
+                      style={{ background: draft.quality === "Officieel" ? "var(--p-blue)" : "#D4D8E0" }}
+                    >
+                      <span className="p-switch-thumb" style={{ left: draft.quality === "Officieel" ? 21 : 3 }} />
+                    </div>
+                  </div>
+                  <div className="p-field" style={{ width: 110, flexShrink: 0 }}>
+                    <label>Prijs</label>
+                    <div className="p-inputwrap">
+                      <span className="p-prefix">€</span>
+                      <input className="p-input p-input-prefixed" value={draft.price_text}
+                        onChange={e => setDraft(d => ({ ...d, price_text: e.target.value }))}
+                        placeholder="79" />
+                    </div>
+                    <label className="p-cataloglabel" style={{ marginTop: 4 }}>
+                      <input type="checkbox" checked={draft.save_to_catalog}
+                        onChange={e => setDraft(d => ({ ...d, save_to_catalog: e.target.checked }))} />
+                      Catalogus
+                    </label>
                   </div>
                 </div>
               </div>
@@ -783,33 +800,19 @@ export default function AdminPage() {
                       onChange={e => setDraft(d => ({ ...d, preferred_time: e.target.value }))} />
                   </div>
                 </div>
-                <div className="p-field">
-                  <label>Prijs</label>
-                  <div className="p-inputwrap">
-                    <span className="p-prefix">€</span>
-                    <input className="p-input p-input-prefixed" value={draft.price_text}
-                      onChange={e => setDraft(d => ({ ...d, price_text: e.target.value }))}
-                      placeholder="bijv. 79" />
-                  </div>
-                  <label className="p-cataloglabel">
-                    <input type="checkbox" checked={draft.save_to_catalog}
-                      onChange={e => setDraft(d => ({ ...d, save_to_catalog: e.target.checked }))} />
-                    Ook opslaan in catalogus
-                  </label>
-                  {draft.repairs.length > 0 && (() => {
-                    const parseNum = (s: string) => { const n = parseFloat(s.replace(/[€\s]/g, "").replace(",", ".")); return isNaN(n) ? null : n; };
-                    const main = parseNum(draft.price_text);
-                    const extras = draft.repairs.map(r => parseNum(r.price)).filter((n): n is number => n !== null);
-                    if (main === null && extras.length === 0) return null;
-                    const sum = (main ?? 0) + extras.reduce((a, b) => a + b, 0);
-                    return (
-                      <div className="p-price-total">
-                        <span>Totaal</span>
-                        <span className="p-price-total-val">€{sum % 1 === 0 ? sum : sum.toFixed(2)}</span>
-                      </div>
-                    );
-                  })()}
-                </div>
+                {(() => {
+                  const parseNum = (s: string) => { const n = parseFloat((s || "").replace(/[€\s]/g, "").replace(",", ".")); return isNaN(n) ? null : n; };
+                  const main = parseNum(draft.price_text);
+                  const extras = draft.repairs.map(r => parseNum(r.price)).filter((n): n is number => n !== null);
+                  if (main === null && extras.length === 0) return null;
+                  const sum = (main ?? 0) + extras.reduce((a, b) => a + b, 0);
+                  return (
+                    <div className="p-price-total">
+                      <span>Totaalprijs</span>
+                      <span className="p-price-total-val">€{sum % 1 === 0 ? sum : sum.toFixed(2)}</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Notities */}
